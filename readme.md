@@ -3,11 +3,12 @@
 ### 平台兼容
 
 - windows
-
-       支持直接使用
+        
+      需要把 libs目录下的 ocgcore_windows.dll文件放在项目根目录下，重命名为ocgcore.dll
 - linux
 
-       暂时不支持，代码不用怎么改动。ygocore 动态库编译没搭建成功.
+       暂时不支持，代码不用怎么改动。
+       ygocore 动态库编译没搭建成功.然和代码设置连接位置
 
 ### api
 
