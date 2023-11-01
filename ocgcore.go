@@ -1,13 +1,18 @@
-package ygocore
+package main
 
 import "C"
 
 /*
+#cgo CFLAGS: -Iinclude
+#cgo   LDFLAGS:  -L${SRCDIR}/libs -locgcore
 #include "ocgcore.h"
 */
 import "C"
+
+import "C"
 import (
-	"log"
+	"fmt"
+	"os"
 	"unsafe"
 )
 
@@ -26,36 +31,26 @@ func RegisterMessageHandler(f func(data unsafe.Pointer, tp int32)) {
 func RegisterCardReader(f func(cardID uint32, card *CardDataC) bool) {
 	cardReader = f
 }
+func RegisterDo() {
+	C.set_script_reader(C.script_reader(C.goScriptReader))
+	C.set_message_handler(C.message_handler(C.goMessageHandler))
+	C.set_card_reader(C.card_reader(C.goCardReader))
+}
 func init() {
 	scriptReader = func(name string) []byte {
-		log.Println("script", name)
-		return nil
+		bytes, _ := os.ReadFile(name)
+		return bytes
 	}
 	messageHandler = func(data unsafe.Pointer, tp int32) {
 		// 将 uintptr 转换为 int64 这里暂时不需要打印日志，所以不写该方法
 		//value := int64(uintptr(data))
 		//return nil
+		fmt.Println("messageHandler")
 	}
-	cardReader = func(cardID uint32, card *CardDataC) bool {
-		return false
-	}
-}
 
-type CardDataC struct {
-	code        uint32
-	alias       uint32
-	setcode     uint64
-	typ         uint32
-	level       uint32
-	attribute   uint32
-	race        uint32
-	attack      int32
-	defense     int32
-	lscale      uint32
-	rscale      uint32
-	link_marker uint32
-	ot          uint32
-	category    int
+	cardReader = func(cardID uint32, card *CardDataC) bool {
+		return getDataForCore(cardID, card)
+	}
 }
 
 //export goScriptReader
@@ -120,8 +115,9 @@ func goCardReader(cardID C.uint32_t, data *C.card_data) C.uint32_t {
 	return 0
 }
 
-func CreateGame(seed int32) uintptr {
+func CreateDuel(seed int32) uintptr {
 	pDuel := C.create_duel(C.int(seed))
+	fmt.Println(pDuel)
 	return uintptr(pDuel)
 }
 func StartDuel(pduel uintptr, options int32) {
@@ -148,9 +144,8 @@ func GetLogMessage(pduel uintptr) []byte {
 	return buf
 }
 
-func GetMessage(pduel uintptr) ([]byte, int32) {
-	var buff = make([]byte, MessageBufLen)
-	return buff, int32(C.get_message(C.longlong(pduel), (*C.uchar)(unsafe.Pointer(&buff[0]))))
+func GetMessage(pduel uintptr, buff []byte) int32 {
+	return int32(C.get_message(C.longlong(pduel), (*C.uchar)(unsafe.Pointer(&buff[0]))))
 }
 func Process(pduel uintptr) int32 {
 	return int32(C.process(C.longlong(pduel)))
