@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"os"
 )
 
 type ClientInterface interface {
@@ -42,6 +44,10 @@ func SendBufferToPlayer(c ClientInterface, MSG uint8, buff []byte, resend ...Cli
 	}
 	return nil
 }
+func init() {
+	os.Remove("hex")
+	os.Create("hex")
+}
 
 type ConsoleClient struct {
 	id int
@@ -49,5 +55,16 @@ type ConsoleClient struct {
 
 func (c *ConsoleClient) Write(arr []byte) error {
 	fmt.Println("console ", c.id, ":", arr)
+	if c.id == 1 {
+		return nil
+	}
+	f, err := os.OpenFile("hex", os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer f.Close()
+
+	f.Write([]byte(hex.EncodeToString(arr) + "\n"))
 	return nil
 }
