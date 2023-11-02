@@ -37,3 +37,6 @@
     func PreloadScript(pduel uintptr, script []byte) int32 
 
   ```
+
+### Git ygo分支
+  这个分支暂时用来制作ygo server
