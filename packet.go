@@ -31,7 +31,6 @@ func (wss *Server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
 	ctx := new(Context)
 	ctx.Id, _ = Sf.NextID()
 	ctx.dp = &DuelPlayer{
-		Name:     "",
 		Type:     0xff,
 		Protocol: TCP,
 		Conn:     c,

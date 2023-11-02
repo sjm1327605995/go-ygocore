@@ -3,52 +3,50 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"go.uber.org/zap"
-	"math/rand"
 )
 
-func main() {
-
-	NewDataManager()
-	RegisterDo()
-	n := rand.Int31n(10000)
-
-	pduel := CreateDuel(n)
-	duel := &SingleDuel{
-		players: []ClientInterface{&ConsoleClient{id: 0}, &ConsoleClient{id: 1}},
-		pduel:   pduel,
-	}
-	SetPlayerInfo(pduel, 0, 8000, 5, 1)
-	SetPlayerInfo(pduel, 1, 8000, 5, 1)
-	var (
-		mainCards = []uint32{14124483, 9411399, 9411399, 18094166, 18094166, 18094166, 40044918, 40044918, 59392529, 50720316, 50720316, 27780618, 27780618, 16605586, 16605586, 22865492, 22865492, 23434538, 23434538, 14558127, 14558127,
-			13650422, 83965310, 81439173, 8949584, 8949584, 32807846, 52947044, 45906428, 24094653, 21143940, 21143940, 21143940, 48130397, 24224830, 24224830, 12071500, 24299458, 24299458, 10045474}
-		exidCards = []uint32{73580471, 79606837, 79606837, 79606837, 21521304, 27552504, 1174075, 1174075, 1174075, 73898890, 73898890, 72336818, 41999284, 94259633, 94259633}
-	)
-	for i := len(mainCards) - 1; i >= 0; i-- {
-		NewCard(pduel, mainCards[i], 0, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
-	}
-	for i := len(exidCards) - 1; i >= 0; i-- {
-		NewCard(pduel, exidCards[i], 0, 0, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
-	}
-	for i := len(mainCards) - 1; i >= 0; i-- {
-		NewCard(pduel, mainCards[i], 1, 1, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
-	}
-	for i := len(exidCards) - 1; i >= 0; i-- {
-		NewCard(pduel, exidCards[i], 1, 1, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
-	}
-	count1 := QueryFieldCount(pduel, 0, 0x1)
-	count2 := QueryFieldCount(pduel, 0, 0x40)
-	count3 := QueryFieldCount(pduel, 1, 0x1)
-	count4 := QueryFieldCount(pduel, 1, 0x40)
-	fmt.Println(count1, count2, count3, count4)
-	duel.RefreshExtraDef(0)
-	duel.RefreshExtraDef(1)
-	opt := 5 << 16
-	StartDuel(pduel, int32(opt))
-
-	duel.Process()
-}
+// func main() {
+//
+//		NewDataManager()
+//		RegisterDo()
+//		n := rand.Int31n(10000)
+//
+//		pduel := CreateDuel(n)
+//		duel := &SingleDuel{
+//			players: []ClientInterface{&ConsoleClient{id: 0}, &ConsoleClient{id: 1}},
+//			pduel:   pduel,
+//		}
+//		SetPlayerInfo(pduel, 0, 8000, 5, 1)
+//		SetPlayerInfo(pduel, 1, 8000, 5, 1)
+//		var (
+//			mainCards = []uint32{14124483, 9411399, 9411399, 18094166, 18094166, 18094166, 40044918, 40044918, 59392529, 50720316, 50720316, 27780618, 27780618, 16605586, 16605586, 22865492, 22865492, 23434538, 23434538, 14558127, 14558127,
+//				13650422, 83965310, 81439173, 8949584, 8949584, 32807846, 52947044, 45906428, 24094653, 21143940, 21143940, 21143940, 48130397, 24224830, 24224830, 12071500, 24299458, 24299458, 10045474}
+//			exidCards = []uint32{73580471, 79606837, 79606837, 79606837, 21521304, 27552504, 1174075, 1174075, 1174075, 73898890, 73898890, 72336818, 41999284, 94259633, 94259633}
+//		)
+//		for i := len(mainCards) - 1; i >= 0; i-- {
+//			NewCard(pduel, mainCards[i], 0, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
+//		}
+//		for i := len(exidCards) - 1; i >= 0; i-- {
+//			NewCard(pduel, exidCards[i], 0, 0, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
+//		}
+//		for i := len(mainCards) - 1; i >= 0; i-- {
+//			NewCard(pduel, mainCards[i], 1, 1, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
+//		}
+//		for i := len(exidCards) - 1; i >= 0; i-- {
+//			NewCard(pduel, exidCards[i], 1, 1, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
+//		}
+//		count1 := QueryFieldCount(pduel, 0, 0x1)
+//		count2 := QueryFieldCount(pduel, 0, 0x40)
+//		count3 := QueryFieldCount(pduel, 1, 0x1)
+//		count4 := QueryFieldCount(pduel, 1, 0x40)
+//		fmt.Println(count1, count2, count3, count4)
+//		duel.RefreshExtraDef(0)
+//		duel.RefreshExtraDef(1)
+//		opt := 5 << 16
+//		StartDuel(pduel, int32(opt))
+//
+//		duel.Process()
+//	}
 func (d *SingleDuel) RefreshExtraDef(player uint8) {
 	d.RefreshExtra(d.pduel, player, 0xe81fff, 1)
 }
@@ -67,7 +65,7 @@ func (d *SingleDuel) RefreshHandDef(player uint8) {
 //void RefreshGrave(int player, int flag = 0x81fff, int use_cache = 1);
 
 func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache int32) {
-	zap.L().Info("RefreshExtra")
+	fmt.Println("RefreshExtra")
 	var (
 		originBuf = ocgPool.Get().([]byte)
 		qbuf      = originBuf[3:]
@@ -82,7 +80,7 @@ func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache i
 
 }
 func (d *SingleDuel) RefreshMzone(pdule uintptr, player uint8, flag, use_cache int32) {
-	zap.L().Info("RefreshMzone")
+	fmt.Println("RefreshMzone")
 	var (
 		originBuf = ocgPool.Get().([]byte)
 		qbuf      = originBuf[3:]
@@ -119,7 +117,7 @@ func (d *SingleDuel) RefreshMzone(pdule uintptr, player uint8, flag, use_cache i
 	//NetServer::ReSendToPlayer(*pit);
 }
 func (d *SingleDuel) RefreshSzone(pdule uintptr, player uint8, flag, use_cache int32) {
-	zap.L().Info("RefreshSzone")
+	fmt.Println("RefreshSzone")
 	var (
 		originBuf = ocgPool.Get().([]byte)
 		qbuf      = originBuf[3:]
@@ -156,7 +154,7 @@ func (d *SingleDuel) RefreshSzone(pdule uintptr, player uint8, flag, use_cache i
 	//NetServer::ReSendToPlayer(*pit);
 }
 func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache int32) {
-	zap.L().Info("RefreshHand")
+	fmt.Println("RefreshHand")
 	var (
 		originBuf = ocgPool.Get().([]byte)
 		qbuf      = originBuf[3:]
@@ -316,13 +314,13 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 		offset = pbuf.Position()
 		var engType uint8
 		_ = binary.Read(pbuf, binary.LittleEndian, &engType)
-		zap.L().Info("engType", zap.Uint8("value", engType))
+		fmt.Println("engType", engType)
 		switch engType {
 		case MSG_RETRY:
 			WaitforResponse()
 			return 1
 		case MSG_HINT:
-			zap.L().Info("MSG_HINT")
+			fmt.Println("MSG_HINT")
 			_ = binary.Read(pbuf, binary.LittleEndian, &typ)
 			_ = binary.Read(pbuf, binary.LittleEndian, &player)
 			pbuf.Next(4)

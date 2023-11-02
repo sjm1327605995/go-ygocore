@@ -10,7 +10,7 @@ import (
 )
 
 type DuelPlayer struct {
-	Name     string //40 byte
+	Name     []byte //40 byte
 	RealName []byte
 	Type     uint16
 	Status   uint8

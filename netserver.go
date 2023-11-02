@@ -47,34 +47,28 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 			return
 		}
 		var res ctos.HandResult
-		//TODO
-		//res.Parse(data)
+		res.Parse(data)
 		dp.game.HandResult(dp, res.Res)
 	case ctos.CTOS_TP_RESULT:
 		if dp.game == nil {
 			return
 		}
 		var res ctos.TPResult
-		//TODO
-		//res.Parse(data)
+		err := res.Parse(data)
+		if err != nil {
+			return
+		}
 		dp.game.TPResult(dp, res.Res)
 	case ctos.CTOS_PLAYER_INFO:
 		var pkt ctos.PlayerInfo
-		//TODO
-		//err := pkt.Parse(buf)
-		//if err != nil {
-		//	fmt.Println(err)
-		//	return
-		//}
-		//BufferIO::CopyWStr(pkt->name, dp->name, 20);
+		_ = pkt.Parse(data)
 		dp.Name = pkt.Name
 	case ctos.CTOS_CREATE_GAME: //TODO 暂时请求未使用到 比较疑惑
 		if dp.game != nil || duelMode == nil {
 			return
 		}
-		//	CTOS_CreateGame* pkt = (CTOS_CreateGame*)pdata;
 		var pkt ctos.CreateGame
-
+		pkt.Parse(data)
 		switch pkt.Info.Mode {
 		case MODE_SINGLE, MODE_MATCH:
 			duelMode = new(SingleDuel)
@@ -132,11 +126,10 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		if dp.game == nil || duelMode.PDuel() == 0 {
 			return
 		}
-		var pos uint8
-		//TODO
-		//CTOS_Kick* pkt = (CTOS_Kick*)pdata;
-		//pos =pkt.pos
-		duelMode.PlayerKick(dp, pos)
+
+		var pkt ctos.Kick
+		pkt.Parse(data)
+		duelMode.PlayerKick(dp, pkt.Pos)
 	case CTOS_HS_START:
 		if dp.game == nil || duelMode.PDuel() == 0 {
 			return

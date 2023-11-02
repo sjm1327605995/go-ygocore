@@ -2,30 +2,34 @@ package ctos
 
 import (
 	"bytes"
+	"encoding/binary"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
 )
 
 type PlayerInfo struct {
-	Name     string
-	RealName []byte
+	Name []byte
 }
 
 const (
 	StrLimit = 40
 )
 
-func (p *PlayerInfo) Parse(b *bytes.Buffer) (err error) {
+func (p *PlayerInfo) Parse(buff []byte) (err error) {
+	if len(p.Name) == 0 {
+		p.Name = make([]byte, StrLimit)
+	}
+	reader := bytes.NewReader(buff)
 	// 将二进制数组转换为字符串
-	return nil
+	return binary.Read(reader, binary.LittleEndian, p)
 }
 
 type TPResult struct {
 	Res uint8
 }
 
-func (h *TPResult) Parse(b *bytes.Buffer) (err error) {
-	//return utils.GetData(b, &h.Res)
-	return nil
+func (h *TPResult) Parse(buff []byte) (err error) {
+	reader := bytes.NewReader(buff)
+	return binary.Read(reader, binary.LittleEndian, &h)
 }
 
 type CreateGame struct {
@@ -34,7 +38,8 @@ type CreateGame struct {
 	Pass string
 }
 
-func (h *CreateGame) Parse(b *bytes.Buffer) (err error) {
+func (h *CreateGame) Parse(buff []byte) (err error) {
+
 	return nil
 }
 
@@ -51,11 +56,12 @@ func (h *JoinGame) Parse(b *bytes.Buffer) (err error) {
 }
 
 type Kick struct {
-	Pos uint16
+	Pos uint8
 }
 
-func (h *Kick) Parse(b *bytes.Buffer) (err error) {
-	return nil
+func (h *Kick) Parse(buff []byte) (err error) {
+	reader := bytes.NewReader(buff)
+	return binary.Read(reader, binary.LittleEndian, h)
 
 }
 
@@ -63,7 +69,8 @@ type HandResult struct {
 	Res uint8
 }
 
-func (h *HandResult) Parse(b *bytes.Buffer) (err error) {
-	return nil
+func (h *HandResult) Parse(buff []byte) (err error) {
+	reader := bytes.NewReader(buff)
+	return binary.Read(reader, binary.LittleEndian, h)
 
 }
