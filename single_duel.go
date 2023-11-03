@@ -662,11 +662,9 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 
 			_ = binary.Read(pbuf, binary.LittleEndian, &player)
 			_ = binary.Read(pbuf, binary.LittleEndian, &count)
-
 			fmt.Println("MSG_DRAW", player, count)
 			var cards = make([]uint32, count)
 			_ = binary.Read(pbuf, binary.LittleEndian, &cards)
-			fmt.Println("  cards:", cards)
 
 			SendPacketToPlayer(d.players[player], STOC_GAME_MSG, BytesPacket(pbuf.OffsetBytes(offset)))
 			index := 3
@@ -679,11 +677,12 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 				index += 4
 			}
 			SendPacketToPlayer(d.players[1-player], STOC_GAME_MSG, BytesPacket(pbuf.OffsetBytes(offset)))
-		//观众暂不考虑
-		//	for(auto oit = observers.begin(); oit != observers.end(); ++oit)
+			for i := range d.observers {
+				SendPacketToPlayer(d.observers[i], STOC_GAME_MSG, BytesPacket(pbuf.OffsetBytes(offset)))
+			}
+			//for(auto oit = observers.begin(); oit != observers.end(); ++oit)
 		//NetServer::ReSendToPlayer(*oit);
-		//	break;
-		//}
+
 		case MSG_DAMAGE:
 		//	pbuf += 5;
 		//NetServer::SendBufferToPlayer(players[0], STOC_GAME_MSG, offset, pbuf - offset);

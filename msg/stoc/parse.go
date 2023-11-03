@@ -30,7 +30,7 @@ type JoinGame struct {
 }
 
 func (j JoinGame) Marshal() ([]byte, error) {
-	b := bytes.NewBuffer(make([]byte, 100))
+	b := bytes.NewBuffer(make([]byte, 0, 100))
 	err := binary.Write(b, binary.LittleEndian, &j)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ type HSPlayerEnter struct {
 }
 
 func (h HSPlayerEnter) Marshal() ([]byte, error) {
-	b := bytes.NewBuffer(make([]byte, 50))
+	b := bytes.NewBuffer(make([]byte, 0, 50))
 	err := binary.Write(b, binary.LittleEndian, &h)
 	if err != nil {
 		return nil, err
