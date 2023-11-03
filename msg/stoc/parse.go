@@ -3,7 +3,7 @@ package stoc
 import (
 	"bytes"
 	"encoding/binary"
-	"go-ygosrv/core/msg/host"
+	"github.com/sjm1327605995/go-ygocore/msg/host"
 )
 
 const ChatMsgLimit = 255 * 2
@@ -29,16 +29,21 @@ type JoinGame struct {
 	Info host.HostInfo
 }
 
-func (j *JoinGame) ToBytes(buffer *bytes.Buffer) error {
-	return binary.Write(buffer, binary.LittleEndian, j.Info)
+func (j JoinGame) Marshal() ([]byte, error) {
+	b := bytes.NewBuffer(make([]byte, 100))
+	err := binary.Write(b, binary.LittleEndian, &j)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 type TypeChange struct {
 	Type uint8
 }
 
-func (t *TypeChange) ToBytes(buffer *bytes.Buffer) error {
-	return binary.Write(buffer, binary.LittleEndian, t)
+func (t TypeChange) Marshal() ([]byte, error) {
+	return []byte{t.Type}, nil
 }
 
 //type ExitGame struct {
@@ -79,14 +84,33 @@ func WSStr(arr []byte) []byte {
 }
 
 type HSPlayerEnter struct {
-	Name []byte
+	Name [40]byte
 	Pos  uint16
 }
 
-func (c *HSPlayerEnter) ToBytes(buff *bytes.Buffer) error {
+func (h HSPlayerEnter) Marshal() ([]byte, error) {
+	b := bytes.NewBuffer(make([]byte, 50))
+	err := binary.Write(b, binary.LittleEndian, &h)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
 
-	buff.Write(c.Name)
+type HSWatchChange struct {
+	WatchCount uint16
+}
 
-	return binary.Write(buff, binary.LittleEndian, c.Pos)
+func (h HSWatchChange) Marshal() ([]byte, error) {
+	arr := make([]byte, 2)
+	binary.LittleEndian.PutUint16(arr, h.WatchCount)
+	return arr, nil
+}
 
+type HSPlayerChange struct {
+	Status uint8
+}
+
+func (t HSPlayerChange) Marshal() ([]byte, error) {
+	return []byte{t.Status}, nil
 }

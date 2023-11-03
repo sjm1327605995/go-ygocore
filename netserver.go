@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/sjm1327605995/go-ygocore/msg/ctos"
+	"github.com/sjm1327605995/go-ygocore/msg/host"
 )
 
 var duelMode DuelMode
@@ -98,9 +99,21 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		//StartBroadcast();
 	case ctos.CTOS_JOIN_GAME: //TODO 现在如果game为空就进行初始化
 		if duelMode == nil {
-			return
+			s := new(SingleDuel)
+			s.hostInfo = host.HostInfo{
+				DuleRule:      5,
+				NoCheckDeck:   0,
+				NoShuffleDeck: 0,
+				StartLp:       8000,
+				StartHand:     5,
+				DrawCount:     1,
+				TimeLimit:     180,
+			}
+			duelMode = s
+
 		}
-		duelMode.JoinGame(dp, data, false)
+		isCreator := duelMode.IsCreator(dp)
+		duelMode.JoinGame(dp, data, isCreator)
 
 	case ctos.CTOS_LEAVE_GAME:
 		duelMode.LeaveGame(dp)

@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	WS uint8 = iota + 1
-	TCP
+	TCP uint8 = iota + 1
+	WS
 )
 
 type Server struct {

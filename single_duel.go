@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/sjm1327605995/go-ygocore/msg/ctos"
+	"github.com/sjm1327605995/go-ygocore/msg/host"
+	"github.com/sjm1327605995/go-ygocore/msg/stoc"
 )
 
 // func main() {
@@ -199,9 +202,15 @@ func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache in
 }
 
 type SingleDuel struct {
+	DuelModeBase
 	pduel        uintptr
-	players      []ClientInterface
+	hostPlayer   *DuelPlayer
+	players      [2]*DuelPlayer
+	observers    []*DuelPlayer
 	engineBuffer []byte
+	pass         [40]byte
+	hostInfo     host.HostInfo
+	Ready        [2]bool
 }
 
 func (d *SingleDuel) Chat(dp *DuelPlayer, buff []byte) {
@@ -209,9 +218,115 @@ func (d *SingleDuel) Chat(dp *DuelPlayer, buff []byte) {
 	panic("implement me")
 }
 
-func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, flag bool) {
-	//TODO implement me
-	panic("implement me")
+const PRO_VERSION uint16 = 0x1360
+
+func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
+
+	if isCreator {
+		if dp.game != nil || dp.Type != 0xff {
+			//		STOC_ErrorMsg scem;
+			//			scem.msg = ERRMSG_JOINERROR;
+			//			scem.code = 0;
+			//			NetServer::SendPacketToPlayer(dp, STOC_ERROR_MSG, scem);
+			//			NetServer::DisconnectPlayer(dp);
+			//			return;
+		}
+		var pkt ctos.JoinGame
+		err := pkt.Parse(buff)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if pkt.Version != PRO_VERSION {
+			fmt.Println("version err")
+			return
+		}
+
+		//pkt.Pass=d.pass
+	}
+	//房密码要和 用户密码匹配
+	dp.game = d
+	if d.players[0] == nil && d.players[1] == nil && len(d.observers) == 0 {
+		d.hostPlayer = dp
+	}
+	var (
+		scjg stoc.JoinGame
+		sctc stoc.TypeChange
+	)
+	scjg.Info = d.hostInfo
+	if d.hostPlayer == dp {
+		sctc.Type = 0x10
+	}
+	if d.players[0] == nil || d.players[1] == nil {
+		var scpe stoc.HSPlayerEnter
+		scpe.Name = dp.Name
+		if d.players[0] == nil {
+			scpe.Pos = 0
+		} else {
+			scpe.Pos = 1
+		}
+		if d.players[0] != nil {
+			SendPacketToPlayer(d.players[0], STOC_HS_PLAYER_ENTER, scpe)
+		}
+		if d.players[1] != nil {
+			SendPacketToPlayer(d.players[1], STOC_HS_PLAYER_ENTER, scpe)
+		}
+
+		for i := range d.observers {
+			SendPacketToPlayer(d.observers[i], STOC_HS_PLAYER_ENTER, scpe)
+		}
+		if d.players[0] == nil {
+			d.players[0] = dp
+			dp.Type = NETPLAYER_TYPE_PLAYER1
+			sctc.Type |= NETPLAYER_TYPE_PLAYER1
+		} else {
+			d.players[1] = dp
+			dp.Type = NETPLAYER_TYPE_PLAYER2
+			sctc.Type |= NETPLAYER_TYPE_PLAYER2
+		}
+	} else {
+		d.observers = append(d.observers, dp)
+		dp.Type = NETPLAYER_TYPE_OBSERVER
+		sctc.Type |= NETPLAYER_TYPE_OBSERVER
+		var scwc stoc.HSWatchChange
+		scwc.WatchCount = uint16(len(d.observers))
+		if d.players[0] != nil {
+			SendPacketToPlayer(d.players[0], STOC_HS_WATCH_CHANGE, scwc)
+		}
+		if d.players[1] != nil {
+			SendPacketToPlayer(d.players[1], STOC_HS_WATCH_CHANGE, scwc)
+		}
+		for i := range d.observers {
+			SendPacketToPlayer(d.observers[i], STOC_HS_WATCH_CHANGE, scwc)
+		}
+	}
+	SendPacketToPlayer(dp, STOC_JOIN_GAME, scjg)
+	SendPacketToPlayer(dp, STOC_TYPE_CHANGE, sctc)
+	if d.players[0] != nil {
+		var scpe stoc.HSPlayerEnter
+		scpe.Name = d.players[0].Name
+		scpe.Pos = 0
+		if d.Ready[0] {
+			var scpc = stoc.HSPlayerChange{
+				Status: PLAYERCHANGE_READY,
+			}
+			SendPacketToPlayer(dp, STOC_HS_PLAYER_CHANGE, scpc)
+		}
+	}
+	if d.players[1] != nil {
+		var scpe stoc.HSPlayerEnter
+		scpe.Name = d.players[1].Name
+		scpe.Pos = 1
+		var scpc = stoc.HSPlayerChange{
+			Status: 0x10 | PLAYERCHANGE_READY,
+		}
+		SendPacketToPlayer(dp, STOC_HS_PLAYER_CHANGE, scpc)
+	}
+	if len(d.observers) > 0 {
+		var scwc stoc.HSWatchChange
+		scwc.WatchCount = uint16(len(d.observers))
+		SendPacketToPlayer(dp, STOC_HS_WATCH_CHANGE, scwc)
+	}
 }
 
 func (d *SingleDuel) LeaveGame(dp *DuelPlayer) {
@@ -782,6 +897,12 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 		}
 	}
 	return 0
+}
+func (d *SingleDuel) IsCreator(dp *DuelPlayer) bool {
+	if d.hostPlayer == nil {
+		return true
+	}
+	return d.hostPlayer == dp
 }
 func WaitforResponse() {
 	fmt.Println("等待用户操作")

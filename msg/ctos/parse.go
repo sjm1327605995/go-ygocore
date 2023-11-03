@@ -7,17 +7,15 @@ import (
 )
 
 type PlayerInfo struct {
-	Name []byte
+	Name [40]byte
 }
 
 const (
-	StrLimit = 40
+	StrLimit = 20
 )
 
 func (p *PlayerInfo) Parse(buff []byte) (err error) {
-	if len(p.Name) == 0 {
-		p.Name = make([]byte, StrLimit)
-	}
+
 	reader := bytes.NewReader(buff)
 	// 将二进制数组转换为字符串
 	return binary.Read(reader, binary.LittleEndian, p)
@@ -47,12 +45,12 @@ type JoinGame struct {
 	Version uint16
 	Align   uint16
 	GameId  uint32
-	Pass    string
+	Pass    [40]byte
 }
 
 // Pass: [40] - 房间密码
-func (h *JoinGame) Parse(b *bytes.Buffer) (err error) {
-	return nil
+func (h *JoinGame) Parse(buff []byte) (err error) {
+	return binary.Read(bytes.NewReader(buff), binary.LittleEndian, h)
 }
 
 type Kick struct {

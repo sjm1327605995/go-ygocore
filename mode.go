@@ -10,8 +10,7 @@ import (
 )
 
 type DuelPlayer struct {
-	Name     []byte //40 byte
-	RealName []byte
+	Name     [40]byte //40 byte
 	Type     uint16
 	Status   uint8
 	Protocol uint8
@@ -21,9 +20,19 @@ type DuelPlayer struct {
 	Pos      uint8 // 0 玩家1  1 玩家2
 }
 
+func (d DuelPlayer) Write(arr []byte) error {
+	switch d.Protocol {
+	case TCP:
+		_, err := d.Conn.Write(arr)
+		return err
+	case WS:
+	}
+	return nil
+}
+
 type DuelMode interface {
 	Chat(dp *DuelPlayer, buff []byte)
-	JoinGame(dp *DuelPlayer, buff []byte, flag bool)
+	JoinGame(dp *DuelPlayer, buff []byte, isCreator bool)
 	LeaveGame(dp *DuelPlayer)
 	ToObserver(dp *DuelPlayer)
 	PlayerReady(dp *DuelPlayer, isReady bool)
@@ -39,6 +48,7 @@ type DuelMode interface {
 	TimeConfirm(dp *DuelPlayer)
 	EndDuel()
 	PDuel() int64
+	IsCreator(dp *DuelPlayer) bool
 }
 type DuelModeBase struct {
 	//Etimer
@@ -47,6 +57,11 @@ type DuelModeBase struct {
 	pDuel      int64
 	Name       string //40个字节
 	Pass       string //40个字节
+}
+
+func (d *DuelModeBase) IsCreator(dp *DuelPlayer) bool {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (d *DuelModeBase) Chat(dp *DuelPlayer, buff []byte) {
