@@ -102,8 +102,8 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 			s := new(SingleDuel)
 			s.hostInfo = host.HostInfo{
 				DuleRule:      5,
-				NoCheckDeck:   0,
-				NoShuffleDeck: 0,
+				NoCheckDeck:   false,
+				NoShuffleDeck: false,
 				StartLp:       8000,
 				StartHand:     5,
 				DrawCount:     1,

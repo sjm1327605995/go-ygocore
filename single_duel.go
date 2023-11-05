@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"github.com/sjm1327605995/go-ygocore/msg/ctos"
@@ -211,6 +212,8 @@ type SingleDuel struct {
 	pass         [40]byte
 	hostInfo     host.HostInfo
 	Ready        [2]bool
+	duelCount    int
+	deckError    [2]int
 }
 
 func (d *SingleDuel) Chat(dp *DuelPlayer, buff []byte) {
@@ -242,7 +245,7 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 			return
 		}
 
-		//pkt.Pass=d.pass
+		pkt.Pass = d.pass
 	}
 	//房密码要和 用户密码匹配
 	dp.game = d
@@ -306,6 +309,7 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 		var scpe stoc.HSPlayerEnter
 		scpe.Name = d.players[0].Name
 		scpe.Pos = 0
+		SendPacketToPlayer(dp, STOC_HS_PLAYER_ENTER, scpe)
 		if d.Ready[0] {
 			var scpc = stoc.HSPlayerChange{
 				Status: PLAYERCHANGE_READY,
@@ -317,6 +321,7 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 		var scpe stoc.HSPlayerEnter
 		scpe.Name = d.players[1].Name
 		scpe.Pos = 1
+		SendPacketToPlayer(dp, STOC_HS_PLAYER_ENTER, scpe)
 		var scpc = stoc.HSPlayerChange{
 			Status: 0x10 | PLAYERCHANGE_READY,
 		}
@@ -350,8 +355,43 @@ func (d *SingleDuel) PlayerKick(dp *DuelPlayer, pos uint8) {
 }
 
 func (d *SingleDuel) UpdateDeck(dp *DuelPlayer, buff []byte) error {
-	//TODO implement me
-	panic("implement me")
+	if dp.Type > 1 || d.Ready[dp.Type] {
+		return nil
+	}
+	reader := bytes.NewReader(buff)
+	var (
+		mainc int32
+		sidec int32
+	)
+	binary.Read(reader, binary.LittleEndian, &mainc)
+	binary.Read(reader, binary.LittleEndian, &sidec)
+	possibleMaxLength := int32((len(buff) - 8) / 4)
+	if mainc > possibleMaxLength || sidec > possibleMaxLength || mainc+sidec > possibleMaxLength {
+		//	STOC_ErrorMsg scem;
+		//	scem.msg = ERRMSG_DECKERROR;
+		//	scem.code = 0;
+		//NetServer::SendPacketToPlayer(dp, STOC_ERROR_MSG, scem);
+	}
+	if d.duelCount == 0 {
+		//deck_error[dp->type] = deckManager.LoadDeck(pdeck[dp->type], (int*)deckbuf, mainc, sidec);
+	} else {
+		//if(deckManager.LoadSide(pdeck[dp->type], (int*)deckbuf, mainc, sidec)) {
+		//ready[dp->type] = true;
+		//NetServer::SendPacketToPlayer(dp, STOC_DUEL_START);
+		//if(ready[0] && ready[1]) {
+		//NetServer::SendPacketToPlayer(players[tp_player], STOC_SELECT_TP);
+		//players[1 - tp_player]->state = 0xff;
+		//players[tp_player]->state = CTOS_TP_RESULT;
+		//duel_stage = DUEL_STAGE_FIRSTGO;
+		//}
+		//} else {
+		//STOC_ErrorMsg scem;
+		//scem.msg = ERRMSG_SIDEERROR;
+		//scem.code = 0;
+		//NetServer::SendPacketToPlayer(dp, STOC_ERROR_MSG, scem);
+		//}
+	}
+	return nil
 }
 
 func (d *SingleDuel) StartDuel(dp *DuelPlayer) {

@@ -26,17 +26,20 @@ func SendPacketToPlayer(c ClientInterface, MSG uint8, packet Packet) error {
 	}
 	buff := make([]byte, len(bytes)+3)
 	copy(buff[3:], bytes)
+
 	return SendBufferToPlayer(c, MSG, buff)
 }
 func SendBufferToPlayer(c ClientInterface, MSG uint8, buff []byte, resend ...ClientInterface) error {
 
 	binary.LittleEndian.PutUint16(buff, uint16(len(buff)-2))
 	buff[2] = MSG
+	fmt.Println(MSG, hex.EncodeToString(buff))
 	err := c.Write(buff)
 	if err != nil {
 		return err
 	}
 	for i := range resend {
+		fmt.Println(MSG, hex.EncodeToString(buff))
 		err = resend[i].Write(buff)
 		if err != nil {
 			return err
