@@ -337,8 +337,64 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 }
 
 func (d *SingleDuel) LeaveGame(dp *DuelPlayer) {
-	//TODO implement me
-	panic("implement me")
+	if dp == d.HostPlayer {
+		EndDuel(d.pduel)
+		//  TODO
+		//	NetServer::StopServer();
+	} else if dp.Type == NETPLAYER_TYPE_OBSERVER {
+		//delete(d.observers,dp.Name)
+		if d.DuelStage == DUEL_STAGE_BEGIN {
+			var scwc stoc.HSWatchChange
+			scwc.WatchCount = uint16(len(d.observers))
+			if d.players[0] != nil {
+				SendPacketToPlayer(d.players[0], STOC_HS_WATCH_CHANGE, scwc)
+			}
+			if d.players[1] != nil {
+				SendPacketToPlayer(d.players[1], STOC_HS_WATCH_CHANGE, scwc)
+			}
+			for i := range d.observers {
+				SendPacketToPlayer(d.observers[i], STOC_HS_WATCH_CHANGE, scwc)
+			}
+		}
+		DisconnectPlayer(dp)
+	} else {
+		if d.DuelStage == DUEL_STAGE_BEGIN {
+			var scpc stoc.HSPlayerChange
+			d.players[dp.Type] = nil
+			d.Ready[dp.Type] = false
+			scpc.Status = uint8(dp.Type<<4 | PLAYERCHANGE_LEAVE)
+			if d.players[0] != nil && dp.Type != 0 {
+				SendPacketToPlayer(d.players[0], STOC_HS_PLAYER_CHANGE, scpc)
+			}
+			if d.players[1] != nil && dp.Type != 1 {
+				SendPacketToPlayer(d.players[1], STOC_HS_PLAYER_CHANGE, scpc)
+			}
+			DisconnectPlayer(dp)
+		} else {
+			if d.DuelStage == DUEL_STAGE_SIDING {
+				if !d.Ready[0] {
+					SendPacketToPlayer(d.players[0], STOC_DUEL_START, nil)
+				}
+				if !d.Ready[1] {
+					SendPacketToPlayer(d.players[1], STOC_DUEL_START, nil)
+				}
+			}
+			if d.DuelStage != DUEL_STAGE_END {
+				wbuf := make([]byte, 6)
+				wbuf[3] = MSG_WIN
+				wbuf[4] = byte(1 - dp.Type)
+				wbuf[5] = 0x24
+				var resendList []ClientInterface
+				resendList = append(resendList, d.players[1])
+				for i := range d.observers {
+					resendList = append(resendList, d.observers[i])
+				}
+				SendBufferToPlayer(d.players[0], STOC_GAME_MSG, wbuf, resendList...)
+				EndDuel(d.pduel)
+			}
+			DisconnectPlayer(dp)
+		}
+	}
 }
 
 func (d *SingleDuel) ToObserver(dp *DuelPlayer) {
@@ -347,10 +403,54 @@ func (d *SingleDuel) ToObserver(dp *DuelPlayer) {
 }
 
 func (d *SingleDuel) PlayerReady(dp *DuelPlayer, isReady bool) {
-	//TODO implement me
-	panic("implement me")
+	if dp.Type > 1 {
+		return
+	}
+	if d.Ready[dp.Type] == isReady {
+		return
+	}
+	if isReady {
+		var deckError int32
+		if !d.hostInfo.NoCheckDeck {
+			if d.deckError[dp.Type] != 0 {
+				deckError = (DECKERROR_UNKNOWNCARD << 28) + d.deckError[dp.Type]
+			} else {
+				allowOCG := d.hostInfo.Rule == 0 || d.hostInfo.Rule == 2
+				//TODO
+				//ygopro 参数类型不一致问题
+				//allowTCG := d.hostInfo.Rule == 1 || d.hostInfo.Rule == 2
+				//deckerror = deckManager.CheckDeck(pdeck[dp->type], host_info.lflist, allow_ocg, allow_tcg); C++代码。
+				deckError = DkManager.CheckDeck(&d.pdeck[dp.Type], d.hostInfo.Lflist, allowOCG)
+			}
+		}
+		if deckError != 0 {
+			var scpc stoc.HSPlayerChange
+			scpc.Status = uint8(dp.Type<<4 | PLAYERCHANGE_NOTREADY)
+			SendPacketToPlayer(dp, STOC_HS_PLAYER_CHANGE, scpc)
+			var scem stoc.ErrorMsg
+			scem.Msg = ERRMSG_DECKERROR
+			scem.Code = uint32(deckError)
+			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			return
+		}
+	}
+	d.Ready[dp.Type] = isReady
+	var scpc stoc.HSPlayerChange
+	scpc.Status = uint8(dp.Type<<4) | IFELSE[uint8](isReady, PLAYERCHANGE_READY, PLAYERCHANGE_NOTREADY)
+	SendPacketToPlayer(d.players[dp.Type], STOC_HS_PLAYER_CHANGE, scpc)
+	if d.players[1-dp.Type] != nil {
+		SendPacketToPlayer(d.players[1-dp.Type], STOC_HS_PLAYER_CHANGE, scpc)
+	}
+	for i := range d.observers {
+		SendPacketToPlayer(d.observers[i], STOC_HS_PLAYER_CHANGE, scpc)
+	}
 }
-
+func IFELSE[T any](condition bool, trueBlock, falseBlock T) T {
+	if condition {
+		return trueBlock
+	}
+	return falseBlock
+}
 func (d *SingleDuel) PlayerKick(dp *DuelPlayer, pos uint8) {
 	//TODO implement me
 	panic("implement me")

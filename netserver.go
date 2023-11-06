@@ -131,7 +131,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		}
 		duelMode.ToObserver(dp)
 	case ctos.CTOS_HS_READY, ctos.CTOS_HS_NOTREADY:
-		if dp.game == nil || duelMode.PDuel() == 0 {
+		if dp.game == nil || duelMode.PDuel() != 0 {
 			return
 		}
 		duelMode.PlayerReady(dp, (CTOS_HS_NOTREADY-pktType) != 0)

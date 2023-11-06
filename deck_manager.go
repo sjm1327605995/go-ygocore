@@ -95,3 +95,6 @@ func (d *DeckManager) LoadSide(deck *Deck, buff []byte, mianc, sidec int) bool {
 	deck = &newDeck
 	return true
 }
+func (d *DeckManager) CheckDeck(deck *Deck, lfhash uint32, rule bool) int32 {
+	return 0
+}
