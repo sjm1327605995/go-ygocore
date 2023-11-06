@@ -1,27 +1,20 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"github.com/panjf2000/gnet/v2"
+	"github.com/sjm1327605995/go-ygocore/config"
 	"log"
-)
-
-var (
-	port      int
-	multicore bool
 )
 
 func main() {
 
-	// Example command: go run main.go --port 8080 --multicore=true
-	flag.IntVar(&port, "port", 8080, "server port")
-	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	config.InitConf()
 
-	flag.Parse()
-	addr := fmt.Sprintf("tcp://127.0.0.1:%d", port)
+	addr := fmt.Sprintf("tcp://127.0.0.1:8080")
+
 	//TCP 和UDP 都支持。对TCP分装的。可以通过TCP添加一层协议解析获取内容
 	var srv = new(Server)
 
-	log.Println("server exits:", gnet.Run(srv, addr, gnet.WithMulticore(multicore), gnet.WithReusePort(true), gnet.WithTicker(false)))
+	log.Println("server exits:", gnet.Run(srv, addr, gnet.WithMulticore(true), gnet.WithReusePort(true), gnet.WithTicker(false)))
 }

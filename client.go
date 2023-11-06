@@ -9,6 +9,7 @@ import (
 
 type ClientInterface interface {
 	Write([]byte) error
+	Close() error
 }
 
 type Packet interface {
@@ -20,6 +21,9 @@ func (b BytesPacket) Marshal() ([]byte, error) {
 	return b, nil
 }
 func SendPacketToPlayer(c ClientInterface, MSG uint8, packet Packet) error {
+	if packet == nil {
+		return SendBufferToPlayer(c, MSG, make([]byte, 3))
+	}
 	bytes, err := packet.Marshal()
 	if err != nil {
 		return err
@@ -70,4 +74,10 @@ func (c *ConsoleClient) Write(arr []byte) error {
 
 	f.Write([]byte(hex.EncodeToString(arr) + "\n"))
 	return nil
+}
+func (c *ConsoleClient) Close() error {
+	return nil
+}
+func DisconnectPlayer(c ClientInterface) error {
+	return c.Close()
 }

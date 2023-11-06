@@ -29,6 +29,9 @@ func (d DuelPlayer) Write(arr []byte) error {
 	}
 	return nil
 }
+func (d DuelPlayer) Close() error {
+	return d.Conn.Close()
+}
 
 type DuelMode interface {
 	Chat(dp *DuelPlayer, buff []byte)

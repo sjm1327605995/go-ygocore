@@ -213,7 +213,9 @@ type SingleDuel struct {
 	hostInfo     host.HostInfo
 	Ready        [2]bool
 	duelCount    int
-	deckError    [2]int
+	deckError    [2]int32
+	pdeck        [2]Deck
+	tpPlayer     uint8
 }
 
 func (d *SingleDuel) Chat(dp *DuelPlayer, buff []byte) {
@@ -227,12 +229,12 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 
 	if isCreator {
 		if dp.game != nil || dp.Type != 0xff {
-			//		STOC_ErrorMsg scem;
-			//			scem.msg = ERRMSG_JOINERROR;
-			//			scem.code = 0;
-			//			NetServer::SendPacketToPlayer(dp, STOC_ERROR_MSG, scem);
-			//			NetServer::DisconnectPlayer(dp);
-			//			return;
+			var scem stoc.ErrorMsg
+			scem.Msg = ERRMSG_JOINERROR
+			scem.Code = 0
+			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			DisconnectPlayer(dp)
+
 		}
 		var pkt ctos.JoinGame
 		err := pkt.Parse(buff)
@@ -367,29 +369,29 @@ func (d *SingleDuel) UpdateDeck(dp *DuelPlayer, buff []byte) error {
 	binary.Read(reader, binary.LittleEndian, &sidec)
 	possibleMaxLength := int32((len(buff) - 8) / 4)
 	if mainc > possibleMaxLength || sidec > possibleMaxLength || mainc+sidec > possibleMaxLength {
-		//	STOC_ErrorMsg scem;
-		//	scem.msg = ERRMSG_DECKERROR;
-		//	scem.code = 0;
-		//NetServer::SendPacketToPlayer(dp, STOC_ERROR_MSG, scem);
+		var scem stoc.ErrorMsg
+		scem.Msg = ERRMSG_DECKERROR
+		scem.Code = 0
+		SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
 	}
 	if d.duelCount == 0 {
-		//deck_error[dp->type] = deckManager.LoadDeck(pdeck[dp->type], (int*)deckbuf, mainc, sidec);
+		d.deckError[dp.Type] = DkManager.LoadDeck(&d.pdeck[dp.Type], buff[8:], int(mainc), int(sidec), false)
 	} else {
-		//if(deckManager.LoadSide(pdeck[dp->type], (int*)deckbuf, mainc, sidec)) {
-		//ready[dp->type] = true;
-		//NetServer::SendPacketToPlayer(dp, STOC_DUEL_START);
-		//if(ready[0] && ready[1]) {
-		//NetServer::SendPacketToPlayer(players[tp_player], STOC_SELECT_TP);
-		//players[1 - tp_player]->state = 0xff;
-		//players[tp_player]->state = CTOS_TP_RESULT;
-		//duel_stage = DUEL_STAGE_FIRSTGO;
-		//}
-		//} else {
-		//STOC_ErrorMsg scem;
-		//scem.msg = ERRMSG_SIDEERROR;
-		//scem.code = 0;
-		//NetServer::SendPacketToPlayer(dp, STOC_ERROR_MSG, scem);
-		//}
+		if DkManager.LoadSide(&d.pdeck[dp.Type], buff[8:], int(mainc), int(sidec)) {
+			d.Ready[dp.Type] = true
+			SendPacketToPlayer(dp, STOC_DUEL_START, nil)
+			if d.Ready[0] && d.Ready[1] {
+				SendPacketToPlayer(d.players[d.tpPlayer], STOC_SELECT_TP, nil)
+				d.players[1-d.tpPlayer].Status = 0xff
+				d.players[d.tpPlayer].Status = CTOS_TP_RESULT
+				d.DuelStage = DUEL_STAGE_FIRSTGO
+			} else {
+				var scem stoc.ErrorMsg
+				scem.Msg = ERRMSG_SIDEERROR
+				scem.Code = 0
+				SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			}
+		}
 	}
 	return nil
 }
@@ -430,8 +432,7 @@ func (d *SingleDuel) EndDuel() {
 }
 
 func (d *SingleDuel) PDuel() int64 {
-	//TODO implement me
-	panic("implement me")
+	return d.pDuel
 }
 
 func (d *SingleDuel) Process() {
@@ -527,9 +528,10 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 			//			time_limit[0] = host_info.time_limit;
 			//			time_limit[1] = host_info.time_limit;
 			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, append([]byte{0, 0, 0}, msgbuffer[offset:pbuf.Position()-offset]...), d.players[1])
+			//for i:=range d.observers{}
 		//			for(auto oit = observers.begin(); oit != observers.end(); ++oit)
 		//				NetServer::ReSendToPlayer(*oit);
-		//			break;
+
 		case MSG_NEW_PHASE:
 			pbuf.Next(2)
 			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, append([]byte{0, 0, 0}, msgbuffer[offset:pbuf.Position()-offset]...), d.players[1])

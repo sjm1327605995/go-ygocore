@@ -4,9 +4,9 @@ type Deck struct {
 	mainLen  int
 	extraLen int
 	sideLen  int
-	main     []interface{}
-	extra    []interface{}
-	side     []interface{}
+	main     []*CardDataC
+	extra    []*CardDataC
+	side     []*CardDataC
 }
 
 func (d *Deck) Clear() {

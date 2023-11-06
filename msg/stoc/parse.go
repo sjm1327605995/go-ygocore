@@ -9,11 +9,17 @@ import (
 const ChatMsgLimit = 255 * 2
 
 type ErrorMsg struct {
-	Msg    uint8
-	Align1 uint8
-	Align2 uint8
-	Align3 uint8
-	Code   uint32
+	Msg  uint8
+	Code uint32
+}
+
+func (t ErrorMsg) Marshal() ([]byte, error) {
+	b := bytes.NewBuffer(make([]byte, 0, 100))
+	err := binary.Write(b, binary.LittleEndian, &t)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 type HandResult struct {
