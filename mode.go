@@ -57,12 +57,14 @@ type DuelMode interface {
 }
 type DuelModeBase struct {
 	//Etimer
-	HostPlayer *DuelPlayer
-	DuelStage  int32
-	pDuel      int64
-	Name       string //40个字节
-	Pass       string //40个字节
-	handResult [2]uint8
+	HostPlayer   *DuelPlayer
+	DuelStage    int32
+	pDuel        int64
+	Name         [40]byte //40个字节
+	Pass         [40]byte //40个字节
+	RealName     string
+	RealPassword string
+	handResult   [2]uint8
 }
 
 func (d *DuelModeBase) IsCreator(dp *DuelPlayer) bool {

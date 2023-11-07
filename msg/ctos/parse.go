@@ -32,8 +32,8 @@ func (h *TPResult) Parse(buff []byte) (err error) {
 
 type CreateGame struct {
 	Info host.HostInfo
-	Name string
-	Pass string
+	Name [40]byte
+	Pass [40]byte
 }
 
 func (h *CreateGame) Parse(buff []byte) (err error) {

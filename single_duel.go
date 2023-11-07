@@ -209,7 +209,6 @@ type SingleDuel struct {
 	players      [2]*DuelPlayer
 	observers    []*DuelPlayer
 	engineBuffer []byte
-	pass         [40]byte
 	hostInfo     host.HostInfo
 	Ready        [2]bool
 	duelCount    int
@@ -239,15 +238,27 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 		var pkt ctos.JoinGame
 		err := pkt.Parse(buff)
 		if err != nil {
-			fmt.Println(err)
+			var scem stoc.ErrorMsg
+			scem.Msg = ERRMSG_JOINERROR
+			scem.Code = 0
+			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			DisconnectPlayer(dp)
 			return
 		}
 		if pkt.Version != PRO_VERSION {
-			fmt.Println("version err")
+			var scem stoc.ErrorMsg
+			scem.Msg = ERRMSG_VERERROR
+			scem.Code = uint32(PRO_VERSION)
+			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			DisconnectPlayer(dp)
 			return
 		}
-
-		pkt.Pass = d.pass
+		arr := make([]byte, len(pkt.Pass))
+		for i := range pkt.Pass {
+			arr[i] = pkt.Pass[i]
+		}
+		jpass := WSStr(arr)
+		fmt.Println(jpass)
 	}
 	//房密码要和 用户密码匹配
 	dp.game = d
