@@ -20,7 +20,7 @@ type BytesPacket []byte
 func (b BytesPacket) Marshal() ([]byte, error) {
 	return b, nil
 }
-func SendPacketToPlayer(c ClientInterface, MSG uint8, packet Packet) error {
+func SendPacketToPlayer(c ClientInterface, MSG uint8, packet Packet, resend ...ClientInterface) error {
 	if packet == nil {
 		return SendBufferToPlayer(c, MSG, make([]byte, 3))
 	}
@@ -31,7 +31,7 @@ func SendPacketToPlayer(c ClientInterface, MSG uint8, packet Packet) error {
 	buff := make([]byte, len(bytes)+3)
 	copy(buff[3:], bytes)
 
-	return SendBufferToPlayer(c, MSG, buff)
+	return SendBufferToPlayer(c, MSG, buff, resend...)
 }
 func SendBufferToPlayer(c ClientInterface, MSG uint8, buff []byte, resend ...ClientInterface) error {
 

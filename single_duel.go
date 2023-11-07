@@ -492,8 +492,40 @@ func (d *SingleDuel) UpdateDeck(dp *DuelPlayer, buff []byte) error {
 }
 
 func (d *SingleDuel) StartDuel(dp *DuelPlayer) {
-	//TODO implement me
-	panic("implement me")
+	if dp != d.HostPlayer {
+		return
+	}
+	if !d.Ready[0] || !d.Ready[1] {
+		return
+	}
+	//TODO
+	//NetServer::StopListen(); 貌似是停止广播
+	var sendPlayer []ClientInterface
+	sendPlayer = append(sendPlayer, d.players[1])
+	for i := range d.observers {
+		sendPlayer = append(sendPlayer, d.observers[i])
+	}
+	SendPacketToPlayer(d.players[0], STOC_DUEL_START, nil, sendPlayer...)
+	deckBuff := make([]byte, 3, 15)
+	pbuf := deckBuff
+	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[0].main)))
+	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[0].extra)))
+	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[0].side)))
+	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[1].main)))
+	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[1].extra)))
+	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[1].side)))
+	SendBufferToPlayer(d.players[0], STOC_DECK_COUNT, deckBuff)
+	tempBuff := make([]byte, 6)
+	copy(tempBuff, deckBuff[:6])
+	copy(deckBuff[:], deckBuff[6:])
+	copy(deckBuff[6:], tempBuff)
+	SendBufferToPlayer(d.players[1], STOC_DECK_COUNT, deckBuff)
+	SendPacketToPlayer(d.players[0], STOC_SELECT_HAND, nil, d.players[1])
+	d.handResult[0] = 0
+	d.handResult[1] = 0
+	d.players[0].Status = CTOS_HAND_RESULT
+	d.players[1].Status = CTOS_HAND_RESULT
+	d.DuelStage = DUEL_STAGE_FINGER
 }
 
 func (d *SingleDuel) HandResult(dp *DuelPlayer, uint82 uint8) {

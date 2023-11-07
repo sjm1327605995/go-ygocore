@@ -62,6 +62,7 @@ type DuelModeBase struct {
 	pDuel      int64
 	Name       string //40个字节
 	Pass       string //40个字节
+	handResult [2]uint8
 }
 
 func (d *DuelModeBase) IsCreator(dp *DuelPlayer) bool {
