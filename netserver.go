@@ -82,25 +82,29 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		if pkt.Info.Mode > 2 {
 			pkt.Info.Mode = 2
 		}
+
+		var hash uint32 = 1
+		for _, lfit := range DkManager.lfList {
+
+			if pkt.Info.Lflist == lfit.hash {
+				hash = pkt.Info.Lflist
+			}
+		}
+		if hash == 1 {
+			pkt.Info.Lflist = DkManager.lfList[0].hash
+		}
+		duelMode.SetHostInfo(pkt.Info)
 		//TODO
-		//unsigned int hash = 1;
-		//		for(auto lfit = deckManager._lfList.begin(); lfit != deckManager._lfList.end(); ++lfit) {
-		//			if(pkt->info.lflist == lfit->hash) {
-		//				hash = pkt->info.lflist;
-		//				break;
-		//			}
-		//		}
-		//		if(hash == 1)
-		//			pkt->info.lflist = deckManager._lfList[0].hash;
-		//		duel_mode->host_info = pkt->info;
 		//		BufferIO::CopyWStr(pkt->name, duel_mode->name, 20);
 		//		BufferIO::CopyWStr(pkt->pass, duel_mode->pass, 20);
 		duelMode.JoinGame(dp, data, true)
 		//StartBroadcast();
 	case ctos.CTOS_JOIN_GAME: //TODO 现在如果game为空就进行初始化
+
 		if duelMode == nil {
 			s := new(SingleDuel)
 			s.hostInfo = host.HostInfo{
+				Lflist:        DkManager.lfList[0].hash,
 				DuleRule:      5,
 				NoCheckDeck:   false,
 				NoShuffleDeck: false,
@@ -112,6 +116,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 			duelMode = s
 
 		}
+
 		isCreator := duelMode.IsCreator(dp)
 		duelMode.JoinGame(dp, data, isCreator)
 
@@ -120,13 +125,13 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 	case ctos.CTOS_SURRENDER:
 		duelMode.Surrender(dp)
 	case ctos.CTOS_HS_TODUELIST:
-		if dp.game == nil || duelMode.PDuel() == 0 {
+		if dp.game == nil || duelMode.PDuel() != 0 {
 			return
 		}
 	//TODO
 	//duelMode.ToDuelist(dp);
 	case ctos.CTOS_HS_TOOBSERVER:
-		if dp.game == nil || duelMode.PDuel() == 0 {
+		if dp.game == nil || duelMode.PDuel() != 0 {
 			return
 		}
 		duelMode.ToObserver(dp)
@@ -136,7 +141,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		}
 		duelMode.PlayerReady(dp, (CTOS_HS_NOTREADY-pktType) != 0)
 	case CTOS_HS_KICK:
-		if dp.game == nil || duelMode.PDuel() == 0 {
+		if dp.game == nil || duelMode.PDuel() != 0 {
 			return
 		}
 
@@ -144,7 +149,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		pkt.Parse(data)
 		duelMode.PlayerKick(dp, pkt.Pos)
 	case CTOS_HS_START:
-		if dp.game == nil || duelMode.PDuel() == 0 {
+		if dp.game == nil || duelMode.PDuel() != 0 {
 			return
 		}
 		duelMode.StartDuel(dp)

@@ -7,6 +7,7 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/panjf2000/gnet/v2"
+	"github.com/sjm1327605995/go-ygocore/msg/host"
 )
 
 type DuelPlayer struct {
@@ -52,6 +53,7 @@ type DuelMode interface {
 	EndDuel()
 	PDuel() int64
 	IsCreator(dp *DuelPlayer) bool
+	SetHostInfo(info host.HostInfo)
 }
 type DuelModeBase struct {
 	//Etimer
@@ -148,6 +150,9 @@ func (d *DuelModeBase) EndDuel() {
 }
 func (d *DuelModeBase) PDuel() int64 {
 	return 0
+}
+func (d *DuelModeBase) SetHostInfo(info host.HostInfo) {
+
 }
 
 type ParseMessage interface {

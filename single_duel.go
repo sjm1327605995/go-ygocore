@@ -415,12 +415,7 @@ func (d *SingleDuel) PlayerReady(dp *DuelPlayer, isReady bool) {
 			if d.deckError[dp.Type] != 0 {
 				deckError = (DECKERROR_UNKNOWNCARD << 28) + d.deckError[dp.Type]
 			} else {
-				allowOCG := d.hostInfo.Rule == 0 || d.hostInfo.Rule == 2
-				//TODO
-				//ygopro 参数类型不一致问题
-				//allowTCG := d.hostInfo.Rule == 1 || d.hostInfo.Rule == 2
-				//deckerror = deckManager.CheckDeck(pdeck[dp->type], host_info.lflist, allow_ocg, allow_tcg); C++代码。
-				deckError = DkManager.CheckDeck(&d.pdeck[dp.Type], d.hostInfo.Lflist, allowOCG)
+				deckError = DkManager.CheckDeck(&d.pdeck[dp.Type], d.hostInfo.Lflist, d.hostInfo.Rule)
 			}
 		}
 		if deckError != 0 {
@@ -1044,6 +1039,9 @@ func (d *SingleDuel) IsCreator(dp *DuelPlayer) bool {
 		return true
 	}
 	return d.hostPlayer == dp
+}
+func (d *SingleDuel) SetHostInfo(info host.HostInfo) {
+	d.hostInfo = info
 }
 func WaitforResponse() {
 	fmt.Println("等待用户操作")

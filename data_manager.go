@@ -35,25 +35,32 @@ func InitDB() error {
 	db, err = gorm.Open(dialector)
 	return err
 }
-func (d *DataManager) LoadDB() error {
-	var results []struct {
-		CardDataC
-		CardString
-	}
 
+type CardsRes struct {
+	CardDataC
+	CardString
+}
+
+func (d *DataManager) LoadDB() error {
+	var results []CardsRes
+	//这种加载效率太慢。后考虑优化
+	d.datas = make(map[int32]*CardDataC, 10000)
+	d.strings = make(map[int32]*CardString, 10000)
 	err := db.Raw("SELECT * FROM datas INNER JOIN texts ON datas.id = texts.id").Scan(&results).Error
 	if err != nil {
 		return err
 	}
-	for _, result := range results {
-		d.datas[result.Code] = &result.CardDataC
-		d.strings[result.Code] = &result.CardString
+	for i := range results {
+		d.datas[results[i].Code] = &results[i].CardDataC
+		d.strings[results[i].Code] = &results[i].CardString
 	}
 	return nil
 }
 func (d *DataManager) GetCodePointer(code int32) *CardDataC {
 	return d.datas[code]
 }
+
+// GetData 只能用户查询单卡效率太慢
 func (d *DataManager) GetData(code int32, cd *CardData) (has bool) {
 	v, has := d.datas[code]
 	if !has {
@@ -75,6 +82,7 @@ func (d *DataManager) GetData(code int32, cd *CardData) (has bool) {
 	cd.LinkMarker = v.LinkMarker
 	return has
 }
+
 func getDataForCore(code uint32, pdata *CardDataC) bool {
 	//target,continuation of the code:
 

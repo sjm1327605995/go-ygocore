@@ -9,8 +9,10 @@ import (
 const ChatMsgLimit = 255 * 2
 
 type ErrorMsg struct {
-	Msg  uint8
-	Code uint32
+	Msg       uint8
+	_padding1 uint16 //结构体字节填充
+	_padding2 uint8  //结构体字节填充
+	Code      uint32
 }
 
 func (t ErrorMsg) Marshal() ([]byte, error) {
