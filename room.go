@@ -4,10 +4,10 @@ import "sync"
 
 var rooms sync.Map
 
-func JoinOrCreateDuelRoom(password string, mode DuelMode) DuelMode {
+func JoinOrCreateDuelRoom(password string, mode DuelMode) (DuelMode, bool) {
 	val, has := rooms.LoadOrStore(password, mode)
 	if has {
-		return val.(DuelMode)
+		return val.(DuelMode), false
 	}
-	return mode
+	return mode, true
 }

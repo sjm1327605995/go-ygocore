@@ -84,10 +84,10 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		var (
 			name = WSStr(arr)
 		)
-		var duelMode DuelMode = &DuelModeBase{}
+		var defaultRoom DuelMode = &DuelModeBase{}
 		switch pkt.Info.Mode {
 		case MODE_SINGLE, MODE_MATCH:
-			duelMode = &SingleDuel{DuelModeBase: DuelModeBase{Pass: pkt.Pass, Name: pkt.Name, RealName: name, RealPassword: password}}
+			defaultRoom = &SingleDuel{DuelModeBase: DuelModeBase{Pass: pkt.Pass, Name: pkt.Name, RealName: name, RealPassword: password}}
 
 		case MODE_TAG:
 			panic("tag duel unsupported")
@@ -109,11 +109,10 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		if hash == 1 {
 			pkt.Info.Lflist = DkManager.lfList[0].hash
 		}
-		duelMode.SetHostInfo(pkt.Info)
+		defaultRoom.SetHostInfo(pkt.Info)
 
-		duelMode = JoinOrCreateDuelRoom(password, duelMode)
-
-		duelMode.JoinGame(dp, data, true)
+		mode, isCreator := JoinOrCreateDuelRoom(password, defaultRoom)
+		mode.JoinGame(dp, data, isCreator)
 		//StartBroadcast();
 	case ctos.CTOS_JOIN_GAME: //TODO 现在如果game为空就进行初始化
 
@@ -128,15 +127,13 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 			DrawCount:     1,
 			TimeLimit:     180,
 		}
-		arr := make([]byte, len(dp.Name))
-		for i := range dp.Name {
-			arr[i] = dp.Name[i]
+		arr := make([]byte, len(dp.Pass))
+		for i := range dp.Pass {
+			arr[i] = dp.Pass[i]
 		}
 		password := WSStr(arr)
-		duelMode := JoinOrCreateDuelRoom(password, defaultRoom)
-		isCreator := duelMode.IsCreator(dp)
-		duelMode.JoinGame(dp, data, isCreator)
-
+		mode, isCreator := JoinOrCreateDuelRoom(password, defaultRoom)
+		mode.JoinGame(dp, data, isCreator)
 	case ctos.CTOS_LEAVE_GAME:
 		dp.game.LeaveGame(dp)
 	case ctos.CTOS_SURRENDER:

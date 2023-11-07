@@ -205,7 +205,6 @@ func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache in
 type SingleDuel struct {
 	DuelModeBase
 	pduel        uintptr
-	hostPlayer   *DuelPlayer
 	players      [2]*DuelPlayer
 	observers    []*DuelPlayer
 	engineBuffer []byte
@@ -263,14 +262,14 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 	//房密码要和 用户密码匹配
 	dp.game = d
 	if d.players[0] == nil && d.players[1] == nil && len(d.observers) == 0 {
-		d.hostPlayer = dp
+		d.HostPlayer = dp
 	}
 	var (
 		scjg stoc.JoinGame
 		sctc stoc.TypeChange
 	)
 	scjg.Info = d.hostInfo
-	if d.hostPlayer == dp {
+	if d.HostPlayer == dp {
 		sctc.Type = 0x10
 	}
 	if d.players[0] == nil || d.players[1] == nil {
@@ -1078,10 +1077,10 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 	return 0
 }
 func (d *SingleDuel) IsCreator(dp *DuelPlayer) bool {
-	if d.hostPlayer == nil {
+	if d.HostPlayer == nil {
 		return true
 	}
-	return d.hostPlayer == dp
+	return d.HostPlayer == dp
 }
 func (d *SingleDuel) SetHostInfo(info host.HostInfo) {
 	d.hostInfo = info
