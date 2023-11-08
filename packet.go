@@ -68,7 +68,6 @@ func (wss *Server) OnBoot(eng gnet.Engine) gnet.Action {
 
 func (wss *Server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
 	ctx := new(Context)
-	ctx.buff = wss.bytesPool.Get()
 	ctx.Id, _ = Sf.NextID()
 	ctx.dp = &DuelPlayer{
 		Type:     0xff,
@@ -84,8 +83,8 @@ func (wss *Server) OnClose(c gnet.Conn, err error) (action gnet.Action) {
 	if err != nil {
 		logging.Warnf("error occurred on connection=%s, %v\n", c.RemoteAddr().String(), err)
 	}
-	ctx := c.Context().(*Context)
-	wss.bytesPool.Put(ctx.buff)
+	//ctx := c.Context().(*Context)
+
 	logging.Infof("conn[%v] disconnected", c.RemoteAddr().String())
 	return gnet.None
 }
@@ -108,11 +107,12 @@ func (wss *Server) OnTraffic(c gnet.Conn) (action gnet.Action) {
 		if err != nil {
 			return gnet.Close
 		}
-		ctx.buff.Write(arr[2:])
 
+		buff := wss.bytesPool.Get()
+		buff.Write(arr[2:])
 		err = wss.goPool.Submit(func() {
-			HandleCTOSPacket(ctx.dp, ctx.buff, ctx.msgLen)
-			wss.bytesPool.Put(ctx.buff)
+			HandleCTOSPacket(ctx.dp, buff, ctx.msgLen)
+			wss.bytesPool.Put(buff)
 		})
 		if err != nil {
 			return gnet.Close
@@ -138,6 +138,5 @@ type Context struct {
 	Id     uint64
 	nextOp tcpReadOp
 	msgLen int
-	buff   *bytes.Buffer
 	dp     *DuelPlayer
 }

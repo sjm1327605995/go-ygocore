@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/sjm1327605995/go-ygocore/msg/ctos"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
 	"github.com/sjm1327605995/go-ygocore/msg/stoc"
@@ -12,6 +13,7 @@ import (
 func HandleCTOSPacket(dp *DuelPlayer, buff *bytes.Buffer, length int) {
 
 	pktType, _ := buff.ReadByte()
+	fmt.Println(pktType)
 	if (pktType != ctos.CTOS_SURRENDER) && (pktType != ctos.CTOS_CHAT) && (dp.Status == 0xff || (dp.Status == 1 && dp.Status != pktType)) {
 		return
 	}
