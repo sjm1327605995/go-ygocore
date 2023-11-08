@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet/v2"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -74,6 +75,16 @@ func (wss *Server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
 		Protocol: TCP,
 		Conn:     c,
 	}
+	ctx.netServer = &NetServer{
+		queue: make(chan *bytes.Buffer, 50),
+	}
+	err := wss.goPool.Submit(func() {
+		ctx.netServer.HandleCTOSPacket(ctx.dp)
+
+	})
+	if err != nil {
+		return nil, gnet.Close
+	}
 	c.SetContext(ctx)
 
 	return nil, gnet.None
@@ -83,8 +94,10 @@ func (wss *Server) OnClose(c gnet.Conn, err error) (action gnet.Action) {
 	if err != nil {
 		logging.Warnf("error occurred on connection=%s, %v\n", c.RemoteAddr().String(), err)
 	}
-	//ctx := c.Context().(*Context)
-
+	ctx := c.Context().(*Context)
+	if ctx.netServer != nil {
+		close(ctx.netServer.queue)
+	}
 	logging.Infof("conn[%v] disconnected", c.RemoteAddr().String())
 	return gnet.None
 }
@@ -110,10 +123,8 @@ func (wss *Server) OnTraffic(c gnet.Conn) (action gnet.Action) {
 
 		buff := wss.bytesPool.Get()
 		buff.Write(arr[2:])
-		err = wss.goPool.Submit(func() {
-			HandleCTOSPacket(ctx.dp, buff, ctx.msgLen)
-			wss.bytesPool.Put(buff)
-		})
+		fmt.Println("写入")
+		ctx.netServer.queue <- buff
 		if err != nil {
 			return gnet.Close
 		}
@@ -135,8 +146,9 @@ const (
 )
 
 type Context struct {
-	Id     uint64
-	nextOp tcpReadOp
-	msgLen int
-	dp     *DuelPlayer
+	Id        uint64
+	nextOp    tcpReadOp
+	msgLen    int
+	dp        *DuelPlayer
+	netServer *NetServer
 }

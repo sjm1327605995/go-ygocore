@@ -43,7 +43,7 @@ type CardData struct {
 type CardString struct {
 	Name string
 	Text string
-	Desc [16]string
+	Desc string
 }
 
 var (

@@ -317,10 +317,14 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff *bytes.Buffer, isCreator bool
 		scpe.Name = d.players[1].Name
 		scpe.Pos = 1
 		SendPacketToPlayer(dp, STOC_HS_PLAYER_ENTER, scpe)
-		var scpc = stoc.HSPlayerChange{
-			Status: 0x10 | PLAYERCHANGE_READY,
+
+		if d.Ready[1] {
+			var scpc = stoc.HSPlayerChange{
+				Status: 0x10 | PLAYERCHANGE_READY,
+			}
+			SendPacketToPlayer(dp, STOC_HS_PLAYER_CHANGE, scpc)
 		}
-		SendPacketToPlayer(dp, STOC_HS_PLAYER_CHANGE, scpc)
+
 	}
 	if len(d.observers) > 0 {
 		var scwc stoc.HSWatchChange
@@ -496,6 +500,7 @@ func (d *SingleDuel) StartDuel(dp *DuelPlayer) {
 	var sendPlayer []ClientInterface
 	sendPlayer = append(sendPlayer, d.players[1])
 	for i := range d.observers {
+		d.observers[i].Status = CTOS_LEAVE_GAME
 		sendPlayer = append(sendPlayer, d.observers[i])
 	}
 	SendPacketToPlayer(d.players[0], STOC_DUEL_START, nil, sendPlayer...)
@@ -550,9 +555,10 @@ func (d *SingleDuel) HandResult(dp *DuelPlayer, res uint8) {
 			d.handResult[1] = 1
 			d.players[0].Status = CTOS_HAND_RESULT
 			d.players[1].Status = CTOS_HAND_RESULT
-		} else if (d.handResult[0] == 1 && d.handResult[1] == 2) || (d.handResult[0] == 2 && d.handResult[1] == 3) ||
+		} else if (d.handResult[0] == 1 && d.handResult[1] == 2) ||
+			(d.handResult[0] == 2 && d.handResult[1] == 3) ||
 			(d.handResult[0] == 3 && d.handResult[1] == 1) {
-			SendPacketToPlayer(d.players[0], STOC_SELECT_TP, nil)
+			SendPacketToPlayer(d.players[1], STOC_SELECT_TP, nil)
 			d.tpPlayer = 1
 			d.players[0].Status = 0xff
 			d.players[1].Status = CTOS_TP_RESULT
@@ -561,6 +567,7 @@ func (d *SingleDuel) HandResult(dp *DuelPlayer, res uint8) {
 			SendPacketToPlayer(d.players[0], STOC_SELECT_TP, nil)
 			d.players[1].Status = 0xff
 			d.players[0].Status = CTOS_TP_RESULT
+			d.tpPlayer = 0
 			d.DuelStage = DUEL_STAGE_FIRSTGO
 		}
 	}

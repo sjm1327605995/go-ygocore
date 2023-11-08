@@ -22,7 +22,7 @@ func (b BytesPacket) Marshal() ([]byte, error) {
 }
 func SendPacketToPlayer(c ClientInterface, MSG uint8, packet Packet, resend ...ClientInterface) error {
 	if packet == nil {
-		return SendBufferToPlayer(c, MSG, make([]byte, 3))
+		return SendBufferToPlayer(c, MSG, make([]byte, 3), resend...)
 	}
 	bytes, err := packet.Marshal()
 	if err != nil {
