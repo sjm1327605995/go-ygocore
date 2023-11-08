@@ -51,10 +51,6 @@ func SendBufferToPlayer(c ClientInterface, MSG uint8, buff []byte, resend ...Cli
 	}
 	return nil
 }
-func init() {
-	os.Remove("hex")
-	os.Create("hex")
-}
 
 type ConsoleClient struct {
 	id int

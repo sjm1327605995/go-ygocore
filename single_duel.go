@@ -4,10 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/sjm1327605995/go-ygocore/msg/ctos"
+	"github.com/sjm1327605995/go-ygocore/config"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
 	"github.com/sjm1327605995/go-ygocore/msg/stoc"
+	"math/rand"
+	"time"
 )
+
+func init() {
+	rand.NewSource(time.Now().UnixNano())
+}
 
 // func main() {
 //
@@ -52,17 +58,17 @@ import (
 //		duel.Process()
 //	}
 func (d *SingleDuel) RefreshExtraDef(player uint8) {
-	d.RefreshExtra(d.pduel, player, 0xe81fff, 1)
+	d.RefreshExtra(d.pDuel, player, 0xe81fff, 1)
 }
 func (d *SingleDuel) RefreshMzoneDef(player uint8) {
-	d.RefreshExtra(d.pduel, player, 0x881fff, 1)
+	d.RefreshExtra(d.pDuel, player, 0x881fff, 1)
 }
 
 func (d *SingleDuel) RefreshSzoneDef(player uint8) {
-	d.RefreshSzone(d.pduel, player, 0x681fff, 1)
+	d.RefreshSzone(d.pDuel, player, 0x681fff, 1)
 }
 func (d *SingleDuel) RefreshHandDef(player uint8) {
-	d.RefreshHand(d.pduel, player, 0x681fff, 1)
+	d.RefreshHand(d.pDuel, player, 0x681fff, 1)
 }
 
 // void RefreshSingle(int player, int location, int sequence, int flag = 0xf81fff);
@@ -204,8 +210,9 @@ func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache in
 
 type SingleDuel struct {
 	DuelModeBase
-	pduel        uintptr
+
 	players      [2]*DuelPlayer
+	pplayer      [2]*DuelPlayer
 	observers    []*DuelPlayer
 	engineBuffer []byte
 	hostInfo     host.HostInfo
@@ -213,6 +220,7 @@ type SingleDuel struct {
 	duelCount    int
 	deckError    [2]int32
 	pdeck        [2]Deck
+	timeLimit    [2]uint16
 	tpPlayer     uint8
 }
 
@@ -223,7 +231,7 @@ func (d *SingleDuel) Chat(dp *DuelPlayer, buff []byte) {
 
 const PRO_VERSION uint16 = 0x1360
 
-func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
+func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff *bytes.Buffer, isCreator bool) {
 
 	if isCreator {
 		if dp.game != nil || dp.Type != 0xff {
@@ -234,32 +242,7 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 			DisconnectPlayer(dp)
 
 		}
-		var pkt ctos.JoinGame
-		err := pkt.Parse(buff)
-		if err != nil {
-			var scem stoc.ErrorMsg
-			scem.Msg = ERRMSG_JOINERROR
-			scem.Code = 0
-			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
-			DisconnectPlayer(dp)
-			return
-		}
-		if pkt.Version != PRO_VERSION {
-			var scem stoc.ErrorMsg
-			scem.Msg = ERRMSG_VERERROR
-			scem.Code = uint32(PRO_VERSION)
-			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
-			DisconnectPlayer(dp)
-			return
-		}
-		arr := make([]byte, len(pkt.Pass))
-		for i := range pkt.Pass {
-			arr[i] = pkt.Pass[i]
-		}
-		jpass := WSStr(arr)
-		fmt.Println(jpass)
 	}
-	//房密码要和 用户密码匹配
 	dp.game = d
 	if d.players[0] == nil && d.players[1] == nil && len(d.observers) == 0 {
 		d.HostPlayer = dp
@@ -348,7 +331,7 @@ func (d *SingleDuel) JoinGame(dp *DuelPlayer, buff []byte, isCreator bool) {
 
 func (d *SingleDuel) LeaveGame(dp *DuelPlayer) {
 	if dp == d.HostPlayer {
-		EndDuel(d.pduel)
+		EndDuel(d.pDuel)
 		//  TODO
 		//	NetServer::StopServer();
 	} else if dp.Type == NETPLAYER_TYPE_OBSERVER {
@@ -400,7 +383,7 @@ func (d *SingleDuel) LeaveGame(dp *DuelPlayer) {
 					resendList = append(resendList, d.observers[i])
 				}
 				SendBufferToPlayer(d.players[0], STOC_GAME_MSG, wbuf, resendList...)
-				EndDuel(d.pduel)
+				EndDuel(d.pDuel)
 			}
 			DisconnectPlayer(dp)
 		}
@@ -525,10 +508,7 @@ func (d *SingleDuel) StartDuel(dp *DuelPlayer) {
 	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[1].extra)))
 	binary.LittleEndian.AppendUint16(pbuf, uint16(len(d.pdeck[1].side)))
 	SendBufferToPlayer(d.players[0], STOC_DECK_COUNT, deckBuff)
-	tempBuff := make([]byte, 6)
-	copy(tempBuff, deckBuff[:6])
-	copy(deckBuff[:], deckBuff[6:])
-	copy(deckBuff[6:], tempBuff)
+	move(deckBuff[3:])
 	SendBufferToPlayer(d.players[1], STOC_DECK_COUNT, deckBuff)
 	SendPacketToPlayer(d.players[0], STOC_SELECT_HAND, nil, d.players[1])
 	d.handResult[0] = 0
@@ -537,17 +517,157 @@ func (d *SingleDuel) StartDuel(dp *DuelPlayer) {
 	d.players[1].Status = CTOS_HAND_RESULT
 	d.DuelStage = DUEL_STAGE_FINGER
 }
-
-func (d *SingleDuel) HandResult(dp *DuelPlayer, uint82 uint8) {
-	//TODO implement me
-	panic("implement me")
+func move(arr []byte) {
+	mid := len(arr) / 2
+	for i := 0; i < mid; i++ {
+		arr[i], arr[i+mid] = arr[i+mid], arr[i]
+	}
+}
+func (d *SingleDuel) HandResult(dp *DuelPlayer, res uint8) {
+	if res > 3 {
+		return
+	}
+	if dp.Status != CTOS_HAND_RESULT {
+		return
+	}
+	d.handResult[dp.Type] = res
+	if d.handResult[0] != 0 && d.handResult[1] != 0 {
+		var schr = stoc.HandResult{
+			Res1: d.handResult[0],
+			Res2: d.handResult[1],
+		}
+		var list []ClientInterface
+		for i := range d.observers {
+			list = append(list, d.observers[i])
+		}
+		SendPacketToPlayer(d.players[0], STOC_HAND_RESULT, schr, list...)
+		schr.Res1 = d.handResult[1]
+		schr.Res2 = d.handResult[0]
+		SendPacketToPlayer(d.players[1], STOC_HAND_RESULT, schr)
+		if d.handResult[0] == d.handResult[1] {
+			SendPacketToPlayer(d.players[0], STOC_SELECT_HAND, nil, d.players[1])
+			d.handResult[0] = 0
+			d.handResult[1] = 1
+			d.players[0].Status = CTOS_HAND_RESULT
+			d.players[1].Status = CTOS_HAND_RESULT
+		} else if (d.handResult[0] == 1 && d.handResult[1] == 2) || (d.handResult[0] == 2 && d.handResult[1] == 3) ||
+			(d.handResult[0] == 3 && d.handResult[1] == 1) {
+			SendPacketToPlayer(d.players[0], STOC_SELECT_TP, nil)
+			d.tpPlayer = 1
+			d.players[0].Status = 0xff
+			d.players[1].Status = CTOS_TP_RESULT
+			d.DuelStage = DUEL_STAGE_FIRSTGO
+		} else {
+			SendPacketToPlayer(d.players[0], STOC_SELECT_TP, nil)
+			d.players[1].Status = 0xff
+			d.players[0].Status = CTOS_TP_RESULT
+			d.DuelStage = DUEL_STAGE_FIRSTGO
+		}
+	}
 }
 
-func (d *SingleDuel) TPResult(dp *DuelPlayer, uint82 uint8) {
-	//TODO implement me
-	panic("implement me")
+func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
+	if dp.Status != CTOS_HAND_RESULT {
+		return
+	}
+	d.DuelStage = DUEL_STAGE_FINGER
+	var (
+		swapped bool
+	)
+	d.pplayer[0] = d.players[0]
+	d.pplayer[1] = d.players[1]
+	if (tp != 0 && dp.Type == 1) || (tp == 0 && dp.Type == 0) {
+		//玩家位置交换
+		d.players[0], d.players[1] = d.players[1], d.players[0]
+		d.players[0].Type, d.players[1].Type = 0, 1
+		d.pdeck[0], d.pdeck[1] = d.pdeck[1], d.pdeck[0]
+		swapped = true
+	}
+	dp.Status = CTOS_RESPONSE
+	seed := rand.Uint32()
+	//ReplayHeader rh;
+	//rh.id = 0x31707279;
+	//rh.version = PRO_VERSION;
+	//rh.flag = REPLAY_UNIFORM;
+	//rh.seed = seed;
+	//rh.start_time = (unsigned int)time(nullptr);
+	//last_replay.BeginRecord();
+	//last_replay.WriteHeader(rh);
+	//last_replay.WriteData(players[0]->name, 40, false);
+	//last_replay.WriteData(players[1]->name, 40, false);
+	if !config.Conf.HostInfo.NoShuffleDeck {
+		Shuffle[[]*CardDataC](d.pdeck[0].main)
+		Shuffle[[]*CardDataC](d.pdeck[1].main)
+	}
+	for i := range d.timeLimit {
+		d.timeLimit[i] = config.Conf.HostInfo.TimeLimit
+	}
+	RegisterDo()
+	d.pDuel = CreateDuel(int32(seed))
+	SetPlayerInfo(d.pDuel, 0, d.hostInfo.StartLp, int32(d.hostInfo.StartHand), int32(d.hostInfo.DrawCount))
+	SetPlayerInfo(d.pDuel, 1, d.hostInfo.StartLp, int32(d.hostInfo.StartHand), int32(d.hostInfo.DrawCount))
+	opt := d.hostInfo.DuleRule << 16
+	if d.hostInfo.NoShuffleDeck {
+		opt |= DUEL_PSEUDO_SHUFFLE
+	}
+	//last_replay.WriteInt32(host_info.start_lp, false);
+	//last_replay.WriteInt32(host_info.start_hand, false);
+	//last_replay.WriteInt32(host_info.draw_count, false);
+	//last_replay.WriteInt32(opt, false);
+	//last_replay.Flush();
+	//last_replay.WriteInt32(pdeck[0].main.size(), false);
+	for i := range d.pdeck[0].main {
+		NewCard(d.pDuel, uint32(d.pdeck[0].main[i].Code), 0, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
+		//last_replay.WriteInt32(pdeck[0].main[i]->first, false);
+	}
+	//last_replay.WriteInt32(pdeck[0].extra.size(), false);
+	for i := range d.pdeck[0].extra {
+		NewCard(d.pDuel, uint32(d.pdeck[0].extra[i].Code), 0, 0, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
+		//last_replay.WriteInt32(pdeck[0].extra[i]->first, false);
+	}
+	//last_replay.WriteInt32(pdeck[1].main.size(), false);
+	for i := range d.pdeck[1].main {
+		NewCard(d.pDuel, uint32(d.pdeck[1].main[i].Code), 1, 1, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
+		//last_replay.WriteInt32(pdeck[1].main[i]->first, false);
+	}
+	//last_replay.WriteInt32(pdeck[1].extra.size(), false);
+	for i := range d.pdeck[0].extra {
+		NewCard(d.pDuel, uint32(d.pdeck[0].extra[i].Code), 1, 1, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
+		//last_replay.WriteInt32(pdeck[1].extra[i]->first, false);
+	}
+	//last_replay.Flush();
+	var startBuf = make([]byte, 3, 34)
+	startBuf = append(startBuf, 0, d.hostInfo.DuleRule)
+	binary.LittleEndian.AppendUint32(startBuf, uint32(d.hostInfo.StartLp))
+	binary.LittleEndian.AppendUint32(startBuf, uint32(d.hostInfo.StartLp))
+	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 0, 0x1)))
+	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 0, 0x40)))
+	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 1, 0x1)))
+	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 1, 0x40)))
+	SendBufferToPlayer(d.players[0], STOC_GAME_MSG, startBuf[:19])
+	startBuf[1] = 0x10
+	SendBufferToPlayer(d.players[1], STOC_GAME_MSG, startBuf[:19])
+	if swapped {
+		startBuf[1] = 0x10
+	} else {
+		startBuf[1] = 0x11
+	}
+	for i := range d.observers {
+		SendBufferToPlayer(d.observers[i], STOC_GAME_MSG, startBuf[:19])
+	}
+	d.RefreshExtraDef(0)
+	d.RefreshExtraDef(1)
+	StartDuel(d.pDuel, int32(opt))
+	if d.hostInfo.TimeLimit != 0 {
+		//TODO 定时器
+	}
+	d.Process()
 }
-
+func Shuffle[S ~[]E, E any](s S) {
+	rand.Shuffle(len(s), func(i, j int) {
+		s[i], s[j] = s[j], s[i]
+	})
+}
 func (d *SingleDuel) Surrender(dp *DuelPlayer) {
 	//TODO implement me
 	panic("implement me")
@@ -568,10 +688,6 @@ func (d *SingleDuel) EndDuel() {
 	panic("implement me")
 }
 
-func (d *SingleDuel) PDuel() int64 {
-	return d.pDuel
-}
-
 func (d *SingleDuel) Process() {
 	var engineBuffer = make([]byte, 0x1000)
 	var (
@@ -585,11 +701,11 @@ func (d *SingleDuel) Process() {
 			break
 		}
 
-		result := Process(d.pduel)
+		result := Process(d.pDuel)
 		engLen = result & 0xffff
 		engFlag = result >> 16
 		if engLen > 0 {
-			_ = GetMessage(d.pduel, engineBuffer)
+			_ = GetMessage(d.pDuel, engineBuffer)
 			stop = d.Analyze(engineBuffer[:engLen])
 		}
 	}

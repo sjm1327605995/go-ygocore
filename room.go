@@ -9,5 +9,6 @@ func JoinOrCreateDuelRoom(password string, mode DuelMode) (DuelMode, bool) {
 	if has {
 		return val.(DuelMode), false
 	}
+
 	return mode, true
 }

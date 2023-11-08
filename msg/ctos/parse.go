@@ -14,20 +14,18 @@ const (
 	StrLimit = 20
 )
 
-func (p *PlayerInfo) Parse(buff []byte) (err error) {
+func (p *PlayerInfo) Parse(buff *bytes.Buffer) (err error) {
 
-	reader := bytes.NewReader(buff)
 	// 将二进制数组转换为字符串
-	return binary.Read(reader, binary.LittleEndian, p)
+	return binary.Read(buff, binary.LittleEndian, p)
 }
 
 type TPResult struct {
 	Res uint8
 }
 
-func (h *TPResult) Parse(buff []byte) (err error) {
-	reader := bytes.NewReader(buff)
-	return binary.Read(reader, binary.LittleEndian, &h)
+func (h *TPResult) Parse(buff *bytes.Buffer) (err error) {
+	return binary.Read(buff, binary.LittleEndian, &h)
 }
 
 type CreateGame struct {
@@ -36,7 +34,7 @@ type CreateGame struct {
 	Pass [40]byte
 }
 
-func (h *CreateGame) Parse(buff []byte) (err error) {
+func (h *CreateGame) Parse(buff *bytes.Buffer) (err error) {
 
 	return nil
 }
@@ -49,17 +47,16 @@ type JoinGame struct {
 }
 
 // Pass: [40] - 房间密码
-func (h *JoinGame) Parse(buff []byte) (err error) {
-	return binary.Read(bytes.NewReader(buff), binary.LittleEndian, h)
+func (h *JoinGame) Parse(buff *bytes.Buffer) (err error) {
+	return binary.Read(buff, binary.LittleEndian, h)
 }
 
 type Kick struct {
 	Pos uint8
 }
 
-func (h *Kick) Parse(buff []byte) (err error) {
-	reader := bytes.NewReader(buff)
-	return binary.Read(reader, binary.LittleEndian, h)
+func (h *Kick) Parse(buff *bytes.Buffer) (err error) {
+	return binary.Read(buff, binary.LittleEndian, h)
 
 }
 
@@ -67,8 +64,7 @@ type HandResult struct {
 	Res uint8
 }
 
-func (h *HandResult) Parse(buff []byte) (err error) {
-	reader := bytes.NewReader(buff)
-	return binary.Read(reader, binary.LittleEndian, h)
+func (h *HandResult) Parse(buff *bytes.Buffer) (err error) {
+	return binary.Read(buff, binary.LittleEndian, h)
 
 }

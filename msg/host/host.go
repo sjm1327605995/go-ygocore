@@ -16,7 +16,7 @@ type HostInfo struct {
 	NoShuffleDeck bool
 	Unknown       uint16
 	Unknown1      uint8
-	StartLp       uint32
+	StartLp       int32
 	StartHand     uint8
 	DrawCount     uint8
 	TimeLimit     uint16

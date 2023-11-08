@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
+	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet/v2"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
-
+	"sync"
 	"time"
 )
 
@@ -12,6 +14,7 @@ const (
 	TCP uint8 = iota + 1
 	WS
 )
+const poolSize = 10000
 
 type Server struct {
 	gnet.BuiltinEventEngine
@@ -19,6 +22,42 @@ type Server struct {
 	addr      string
 	multicore bool
 	eng       gnet.Engine
+	goPool    *ants.Pool
+	bytesPool *BytesPool
+}
+
+type BytesPool struct {
+	pool *sync.Pool
+}
+
+func NewBytesPool() *BytesPool {
+	return &BytesPool{pool: &sync.Pool{
+		New: func() any {
+			return bytes.NewBuffer(make([]byte, 0, 1024))
+		},
+	}}
+}
+func (b *BytesPool) Get() *bytes.Buffer {
+	return b.pool.Get().(*bytes.Buffer)
+}
+func (b *BytesPool) Put(buffer *bytes.Buffer) {
+	buffer.Reset()
+
+	if buffer != nil || buffer.Cap() <= 1024 {
+		b.pool.Put(buffer)
+	}
+	buffer = nil
+}
+func NewServer() *Server {
+	var err error
+	goPool, err := ants.NewPool(10000, ants.WithExpiryDuration(time.Second*5))
+	if err != nil {
+		panic(err)
+	}
+	return &Server{
+		goPool:    goPool,
+		bytesPool: NewBytesPool(),
+	}
 }
 
 func (wss *Server) OnBoot(eng gnet.Engine) gnet.Action {
@@ -29,6 +68,7 @@ func (wss *Server) OnBoot(eng gnet.Engine) gnet.Action {
 
 func (wss *Server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
 	ctx := new(Context)
+	ctx.buff = wss.bytesPool.Get()
 	ctx.Id, _ = Sf.NextID()
 	ctx.dp = &DuelPlayer{
 		Type:     0xff,
@@ -44,11 +84,11 @@ func (wss *Server) OnClose(c gnet.Conn, err error) (action gnet.Action) {
 	if err != nil {
 		logging.Warnf("error occurred on connection=%s, %v\n", c.RemoteAddr().String(), err)
 	}
-
+	ctx := c.Context().(*Context)
+	wss.bytesPool.Put(ctx.buff)
 	logging.Infof("conn[%v] disconnected", c.RemoteAddr().String())
 	return gnet.None
 }
-
 func (wss *Server) OnTraffic(c gnet.Conn) (action gnet.Action) {
 	ctx := c.Context().(*Context)
 	n := c.InboundBuffered()
@@ -68,7 +108,15 @@ func (wss *Server) OnTraffic(c gnet.Conn) (action gnet.Action) {
 		if err != nil {
 			return gnet.Close
 		}
-		HandleCTOSPacket(ctx.dp, arr[2:], ctx.msgLen)
+		ctx.buff.Write(arr[2:])
+
+		err = wss.goPool.Submit(func() {
+			HandleCTOSPacket(ctx.dp, ctx.buff, ctx.msgLen)
+			wss.bytesPool.Put(ctx.buff)
+		})
+		if err != nil {
+			return gnet.Close
+		}
 		ctx.nextOp = readLen
 		ctx.msgLen = 0
 	}
@@ -90,5 +138,6 @@ type Context struct {
 	Id     uint64
 	nextOp tcpReadOp
 	msgLen int
+	buff   *bytes.Buffer
 	dp     *DuelPlayer
 }

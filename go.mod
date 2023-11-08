@@ -5,10 +5,12 @@ go 1.18
 require (
 	github.com/gobwas/ws v1.3.0
 	github.com/mattn/go-sqlite3 v1.14.17
+	github.com/panjf2000/ants/v2 v2.8.2
 	github.com/panjf2000/gnet/v2 v2.3.3
 	github.com/sony/sonyflake v1.2.0
 	github.com/spf13/cast v1.5.1
 	github.com/spf13/viper v1.13.0
+	go.uber.org/zap v1.21.0
 	gorm.io/driver/mysql v1.5.2
 	gorm.io/driver/postgres v1.5.4
 	gorm.io/driver/sqlite v1.5.4
@@ -38,7 +40,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect

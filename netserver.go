@@ -1,19 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"github.com/sjm1327605995/go-ygocore/msg/ctos"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
+	"github.com/sjm1327605995/go-ygocore/msg/stoc"
 	"unicode/utf16"
 )
 
 // HandleCTOSPacket 重构dp结构体优化调用链
-func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
+func HandleCTOSPacket(dp *DuelPlayer, buff *bytes.Buffer, length int) {
 
-	pktType := data[0]
+	pktType, _ := buff.ReadByte()
 	if (pktType != ctos.CTOS_SURRENDER) && (pktType != ctos.CTOS_CHAT) && (dp.Status == 0xff || (dp.Status == 1 && dp.Status != pktType)) {
 		return
 	}
-	data = data[1:]
+
 	switch pktType {
 	case ctos.CTOS_RESPONSE:
 		if dp.game == nil || dp.game.PDuel() == 0 {
@@ -25,7 +27,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		} else {
 			n = length - 1
 		}
-		dp.game.GetResponse(dp, data[:n])
+		dp.game.GetResponse(dp, buff.Next(n))
 	case ctos.CTOS_TIME_CONFIRM:
 		if dp.game == nil || dp.game.PDuel() == 0 {
 			return
@@ -35,40 +37,40 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		if dp.game == nil {
 			return
 		}
-		dp.game.Chat(dp, data)
+		dp.game.Chat(dp, buff.Bytes())
 	case ctos.CTOS_UPDATE_DECK:
 		if dp.game == nil {
 			return
 		}
 
-		dp.game.UpdateDeck(dp, data)
+		dp.game.UpdateDeck(dp, buff.Bytes())
 	case ctos.CTOS_HAND_RESULT:
 		if dp.game == nil {
 			return
 		}
 		var res ctos.HandResult
-		res.Parse(data)
+		res.Parse(buff)
 		dp.game.HandResult(dp, res.Res)
 	case ctos.CTOS_TP_RESULT:
 		if dp.game == nil {
 			return
 		}
 		var res ctos.TPResult
-		err := res.Parse(data)
+		err := res.Parse(buff)
 		if err != nil {
 			return
 		}
 		dp.game.TPResult(dp, res.Res)
 	case ctos.CTOS_PLAYER_INFO:
 		var pkt ctos.PlayerInfo
-		_ = pkt.Parse(data)
+		_ = pkt.Parse(buff)
 		dp.Name = pkt.Name
 	case ctos.CTOS_CREATE_GAME: //TODO 暂时请求未使用到 比较疑惑
 		if dp.game != nil || dp.game == nil {
 			return
 		}
 		var pkt ctos.CreateGame
-		pkt.Parse(data)
+		pkt.Parse(buff)
 
 		arr := make([]byte, len(pkt.Name))
 		for i := range dp.Name {
@@ -87,7 +89,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		var defaultRoom DuelMode = &DuelModeBase{}
 		switch pkt.Info.Mode {
 		case MODE_SINGLE, MODE_MATCH:
-			defaultRoom = &SingleDuel{DuelModeBase: DuelModeBase{Pass: pkt.Pass, Name: pkt.Name, RealName: name, RealPassword: password}}
+			defaultRoom = &SingleDuel{DuelModeBase: DuelModeBase{Pass: pkt.Pass, Name: pkt.Name, RealName: name}}
 
 		case MODE_TAG:
 			panic("tag duel unsupported")
@@ -110,9 +112,8 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 			pkt.Info.Lflist = DkManager.lfList[0].hash
 		}
 		defaultRoom.SetHostInfo(pkt.Info)
-
 		mode, isCreator := JoinOrCreateDuelRoom(password, defaultRoom)
-		mode.JoinGame(dp, data, isCreator)
+		mode.JoinGame(dp, nil, isCreator)
 		//StartBroadcast();
 	case ctos.CTOS_JOIN_GAME: //TODO 现在如果game为空就进行初始化
 
@@ -127,13 +128,33 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 			DrawCount:     1,
 			TimeLimit:     180,
 		}
-		arr := make([]byte, len(dp.Pass))
-		for i := range dp.Pass {
-			arr[i] = dp.Pass[i]
+		var pkt ctos.JoinGame
+		err := pkt.Parse(buff)
+		if err != nil {
+			var scem stoc.ErrorMsg
+			scem.Msg = ERRMSG_JOINERROR
+			scem.Code = 0
+			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			DisconnectPlayer(dp)
+			return
+		}
+
+		if pkt.Version != PRO_VERSION {
+			var scem stoc.ErrorMsg
+			scem.Msg = ERRMSG_VERERROR
+			scem.Code = uint32(PRO_VERSION)
+			SendPacketToPlayer(dp, STOC_ERROR_MSG, scem)
+			DisconnectPlayer(dp)
+			return
+		}
+		arr := make([]byte, len(pkt.Pass))
+		for i := range pkt.Pass {
+			arr[i] = pkt.Pass[i]
 		}
 		password := WSStr(arr)
-		mode, isCreator := JoinOrCreateDuelRoom(password, defaultRoom)
-		mode.JoinGame(dp, data, isCreator)
+		model, isCreator := JoinOrCreateDuelRoom(password, defaultRoom)
+		//这里提前解析，不在JoinGame里面进行 buffer读取。buff实际是个空数组
+		model.JoinGame(dp, nil, isCreator)
 	case ctos.CTOS_LEAVE_GAME:
 		dp.game.LeaveGame(dp)
 	case ctos.CTOS_SURRENDER:
@@ -160,7 +181,7 @@ func HandleCTOSPacket(dp *DuelPlayer, data []byte, length int) {
 		}
 
 		var pkt ctos.Kick
-		pkt.Parse(data)
+		pkt.Parse(buff)
 		dp.game.PlayerKick(dp, pkt.Pos)
 	case CTOS_HS_START:
 		if dp.game == nil || dp.game.PDuel() != 0 {

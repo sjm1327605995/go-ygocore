@@ -29,6 +29,15 @@ type HandResult struct {
 	Res2 uint8
 }
 
+func (t HandResult) Marshal() ([]byte, error) {
+	b := bytes.NewBuffer(make([]byte, 0, 2))
+	err := binary.Write(b, binary.LittleEndian, &t)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
 type CreateGame struct {
 	GameId uint32
 }

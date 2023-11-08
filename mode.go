@@ -36,7 +36,7 @@ func (d DuelPlayer) Close() error {
 
 type DuelMode interface {
 	Chat(dp *DuelPlayer, buff []byte)
-	JoinGame(dp *DuelPlayer, buff []byte, isCreator bool)
+	JoinGame(dp *DuelPlayer, buff *bytes.Buffer, isCreator bool)
 	LeaveGame(dp *DuelPlayer)
 	ToObserver(dp *DuelPlayer)
 	PlayerReady(dp *DuelPlayer, isReady bool)
@@ -51,20 +51,19 @@ type DuelMode interface {
 	GetResponse(dp *DuelPlayer, buff []byte)
 	TimeConfirm(dp *DuelPlayer)
 	EndDuel()
-	PDuel() int64
+	PDuel() uintptr
 	IsCreator(dp *DuelPlayer) bool
 	SetHostInfo(info host.HostInfo)
 }
 type DuelModeBase struct {
 	//Etimer
-	HostPlayer   *DuelPlayer
-	DuelStage    int32
-	pDuel        int64
-	Name         [40]byte //40个字节
-	Pass         [40]byte //40个字节
-	RealName     string
-	RealPassword string
-	handResult   [2]uint8
+	HostPlayer *DuelPlayer
+	DuelStage  int32
+	pDuel      uintptr
+	Name       [40]byte //40个字节
+	Pass       [40]byte //40个字节
+	RealName   string
+	handResult [2]uint8
 }
 
 func (d *DuelModeBase) IsCreator(dp *DuelPlayer) bool {
@@ -77,7 +76,7 @@ func (d *DuelModeBase) Chat(dp *DuelPlayer, buff []byte) {
 	panic("implement me")
 }
 
-func (d *DuelModeBase) JoinGame(dp *DuelPlayer, buff []byte, flag bool) {
+func (d *DuelModeBase) JoinGame(dp *DuelPlayer, buffer *bytes.Buffer, flag bool) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -151,8 +150,8 @@ func (d *DuelModeBase) EndDuel() {
 	//TODO implement me
 	panic("implement me")
 }
-func (d *DuelModeBase) PDuel() int64 {
-	return 0
+func (d *DuelModeBase) PDuel() uintptr {
+	return d.pDuel
 }
 func (d *DuelModeBase) SetHostInfo(info host.HostInfo) {
 
