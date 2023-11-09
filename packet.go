@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet/v2"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -75,6 +74,7 @@ func (wss *Server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
 		Protocol: TCP,
 		Conn:     c,
 	}
+	ctx.ticker = time.NewTicker(time.Second * 3)
 	ctx.netServer = &NetServer{
 		queue: make(chan *bytes.Buffer, 50),
 	}
@@ -123,8 +123,8 @@ func (wss *Server) OnTraffic(c gnet.Conn) (action gnet.Action) {
 
 		buff := wss.bytesPool.Get()
 		buff.Write(arr[2:])
-		fmt.Println("写入")
 		ctx.netServer.queue <- buff
+
 		if err != nil {
 			return gnet.Close
 		}
@@ -151,4 +151,5 @@ type Context struct {
 	msgLen    int
 	dp        *DuelPlayer
 	netServer *NetServer
+	ticker    *time.Ticker
 }

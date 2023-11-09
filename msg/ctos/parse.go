@@ -25,7 +25,7 @@ type TPResult struct {
 }
 
 func (h *TPResult) Parse(buff *bytes.Buffer) (err error) {
-	return binary.Read(buff, binary.LittleEndian, &h)
+	return binary.Read(buff, binary.LittleEndian, h)
 }
 
 type CreateGame struct {

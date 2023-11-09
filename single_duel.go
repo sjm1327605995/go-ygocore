@@ -574,7 +574,7 @@ func (d *SingleDuel) HandResult(dp *DuelPlayer, res uint8) {
 }
 
 func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
-	if dp.Status != CTOS_HAND_RESULT {
+	if dp.Status != CTOS_TP_RESULT {
 		return
 	}
 	d.DuelStage = DUEL_STAGE_FINGER
