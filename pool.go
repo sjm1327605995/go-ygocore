@@ -2,12 +2,7 @@ package main
 
 import (
 	"io"
-	"sync"
 )
-
-var ocgPool = sync.Pool{New: func() any {
-	return make([]byte, 0x2000*2)
-}}
 
 type Buffer struct {
 	buf      []byte
@@ -20,6 +15,7 @@ func (b *Buffer) Position() int {
 	return b.off
 }
 func NewBuffer(buf []byte) *Buffer {
+
 	return &Buffer{buf: buf}
 }
 
@@ -77,3 +73,8 @@ func (b *Buffer) Reset() {
 }
 func (b *Buffer) Bytes() []byte                 { return b.buf[b.off:] }
 func (b *Buffer) OffsetBytes(offset int) []byte { return b.buf[offset:] }
+func (b *Buffer) Write(p []byte) (n int, err error) {
+	b.lastRead = opInvalid
+	b.off += len(p)
+	return copy(b.buf[b.off:], p), nil
+}

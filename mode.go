@@ -46,7 +46,7 @@ type DuelMode interface {
 	HandResult(dp *DuelPlayer, uint82 uint8)
 	TPResult(dp *DuelPlayer, uint82 uint8)
 	Process()
-	Analyze(buff []byte) int
+	Analyze(buff []byte, engLen int32) int
 	Surrender(dp *DuelPlayer)
 	GetResponse(dp *DuelPlayer, buff []byte)
 	TimeConfirm(dp *DuelPlayer)
@@ -57,13 +57,14 @@ type DuelMode interface {
 }
 type DuelModeBase struct {
 	//Etimer
-	HostPlayer *DuelPlayer
-	DuelStage  int32
-	pDuel      uintptr
-	Name       [40]byte //40个字节
-	Pass       [40]byte //40个字节
-	RealName   string
-	handResult [2]uint8
+	HostPlayer   *DuelPlayer
+	DuelStage    int32
+	pDuel        uintptr
+	Name         [40]byte //40个字节
+	Pass         [40]byte //40个字节
+	RealName     string
+	handResult   [2]uint8
+	LastResponse uint8
 }
 
 func (d *DuelModeBase) IsCreator(dp *DuelPlayer) bool {
@@ -126,7 +127,7 @@ func (d *DuelModeBase) Process() {
 	panic("implement me")
 }
 
-func (d *DuelModeBase) Analyze(buff []byte) int {
+func (d *DuelModeBase) Analyze(buff []byte, engLen int32) int {
 	//TODO implement me
 	panic("implement me")
 }

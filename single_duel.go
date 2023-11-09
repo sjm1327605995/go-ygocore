@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/sjm1327605995/go-ygocore/config"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
 	"github.com/sjm1327605995/go-ygocore/msg/stoc"
 	"math/rand"
@@ -70,32 +69,22 @@ func (d *SingleDuel) RefreshSzoneDef(player uint8) {
 func (d *SingleDuel) RefreshHandDef(player uint8) {
 	d.RefreshHand(d.pDuel, player, 0x681fff, 1)
 }
+func (d *SingleDuel) RefreshGraveDef(player uint8) {
+	d.RefreshGrave(d.pDuel, player, 0x81fff, 1)
+}
+func (d *SingleDuel) RefreshSingleDef(player uint8, location uint8, seq uint8) {
+	d.RefreshSingle(player, location, seq, 0xf81fff)
+}
 
 // void RefreshSingle(int player, int location, int sequence, int flag = 0xf81fff);
-//void RefreshGrave(int player, int flag = 0x81fff, int use_cache = 1);
-
-func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache int32) {
-	fmt.Println("RefreshExtra")
-	var (
-		originBuf = ocgPool.Get().([]byte)
-		qbuf      = originBuf[3:]
-	)
-	defer ocgPool.Put(originBuf)
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = LOCATION_EXTRA
-	length := QueryFieldCard(pdule, player, LOCATION_EXTRA, flag, qbuf[3:], use_cache)
-
-	_ = SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
-
-}
+// void RefreshGrave(int player, int flag = 0x81fff, int use_cache = 1);
 func (d *SingleDuel) RefreshMzone(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshMzone")
 	var (
-		originBuf = ocgPool.Get().([]byte)
+		originBuf = make([]byte, 0x2000)
 		qbuf      = originBuf[3:]
 	)
-	defer ocgPool.Put(originBuf)
+
 	qbuf[0] = MSG_UPDATE_DATA
 	qbuf[1] = player
 	qbuf[2] = LOCATION_MZONE
@@ -122,17 +111,21 @@ func (d *SingleDuel) RefreshMzone(pdule uintptr, player uint8, flag, use_cache i
 		qbuf = qbuf[clen-4:]
 
 	}
-	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, originBuf[:length+6])
-	//	for(auto pit = observers.begin(); pit != observers.end(); ++pit)
-	//NetServer::ReSendToPlayer(*pit);
+	var list []ClientInterface
+	for i := range d.observers {
+		list = append(list, d.observers[i])
+	}
+	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, originBuf[:length+6], list...)
+
 }
+
 func (d *SingleDuel) RefreshSzone(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshSzone")
 	var (
-		originBuf = ocgPool.Get().([]byte)
+		originBuf = make([]byte, 0x2000)
 		qbuf      = originBuf[3:]
 	)
-	defer ocgPool.Put(originBuf)
+
 	qbuf[0] = MSG_UPDATE_DATA
 	qbuf[1] = player
 	qbuf[2] = LOCATION_SZONE
@@ -159,17 +152,20 @@ func (d *SingleDuel) RefreshSzone(pdule uintptr, player uint8, flag, use_cache i
 		qbuf = qbuf[clen-4:]
 
 	}
-	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, qbuf[:length])
-	//	for(auto pit = observers.begin(); pit != observers.end(); ++pit)
-	//NetServer::ReSendToPlayer(*pit);
+	var list []ClientInterface
+	for i := range d.observers {
+		list = append(list, d.observers[i])
+	}
+	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, qbuf[:length], list...)
+
 }
 func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshHand")
 	var (
-		originBuf = ocgPool.Get().([]byte)
+		originBuf = make([]byte, 0x2000)
 		qbuf      = originBuf[3:]
 	)
-	defer ocgPool.Put(originBuf)
+
 	qbuf[0] = MSG_UPDATE_DATA
 	qbuf[1] = player
 	qbuf[2] = LOCATION_HAND
@@ -203,9 +199,68 @@ func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache in
 		buffer.Next(int(slen - 4))
 		qlen += slen
 	}
-	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, qbuf[:length])
-	//	for(auto pit = observers.begin(); pit != observers.end(); ++pit)
-	//NetServer::ReSendToPlayer(*pit);
+	var list []ClientInterface
+	for i := range d.observers {
+		list = append(list, d.observers[i])
+	}
+	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, qbuf[:length], list...)
+
+}
+func (d *SingleDuel) RefreshGrave(pdule uintptr, player uint8, flag, use_cache int32) {
+	fmt.Println("RefreshGrave")
+	var (
+		originBuf = make([]byte, 0x2000)
+		qbuf      = originBuf[3:]
+	)
+
+	qbuf[0] = MSG_UPDATE_DATA
+	qbuf[1] = player
+	qbuf[2] = LOCATION_GRAVE
+	length := QueryFieldCard(pdule, player, LOCATION_GRAVE, flag, qbuf[3:], use_cache)
+	var list []ClientInterface
+	list = append(list, d.players[1])
+	for i := range d.observers {
+		list = append(list, d.observers[i])
+	}
+	SendBufferToPlayer(d.players[0], STOC_GAME_MSG, originBuf[:length+6], list...)
+
+}
+func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache int32) {
+	fmt.Println("RefreshExtra")
+	var (
+		originBuf = make([]byte, 0x2000)
+		qbuf      = originBuf[3:]
+	)
+	qbuf[0] = MSG_UPDATE_DATA
+	qbuf[1] = player
+	qbuf[2] = LOCATION_EXTRA
+	length := QueryFieldCard(pdule, player, LOCATION_EXTRA, flag, qbuf[3:], use_cache)
+
+	_ = SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
+
+}
+
+func (d *SingleDuel) RefreshSingle(player uint8, location uint8, sequence uint8, flag int32) {
+	fmt.Println("RefreshSingle")
+	var (
+		originBuf = make([]byte, 0x2000)
+		qbuf      = originBuf[3:]
+	)
+	qbuf[0] = MSG_UPDATE_DATA
+	qbuf[1] = player
+	qbuf[2] = location
+	qbuf[3] = sequence
+	length := QueryFieldCard(d.pDuel, player, LOCATION_GRAVE, flag|QUERY_POSITION, qbuf[3:], 0)
+	SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+7])
+	if location == LOCATION_REMOVED && (qbuf[15]&POS_FACEDOWN) != 0 {
+		return
+	}
+	if location&0x90 != 0 || (location&0x2c != 0 && qbuf[15]&POS_FACEUP != 0) {
+		SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, originBuf[:length+7])
+		for i := range d.observers {
+			SendBufferToPlayer(d.observers[i], STOC_GAME_MSG, originBuf[:length+7])
+		}
+	}
 }
 
 type SingleDuel struct {
@@ -217,6 +272,7 @@ type SingleDuel struct {
 	engineBuffer []byte
 	hostInfo     host.HostInfo
 	Ready        [2]bool
+	matchResult  [3]uint8
 	duelCount    int
 	deckError    [2]int32
 	pdeck        [2]Deck
@@ -602,18 +658,18 @@ func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
 	//last_replay.WriteHeader(rh);
 	//last_replay.WriteData(players[0]->name, 40, false);
 	//last_replay.WriteData(players[1]->name, 40, false);
-	if !config.Conf.HostInfo.NoShuffleDeck {
+	if !d.hostInfo.NoShuffleDeck {
 		Shuffle[[]*CardDataC](d.pdeck[0].main)
 		Shuffle[[]*CardDataC](d.pdeck[1].main)
 	}
 	for i := range d.timeLimit {
-		d.timeLimit[i] = config.Conf.HostInfo.TimeLimit
+		d.timeLimit[i] = d.hostInfo.TimeLimit
 	}
 	RegisterDo()
 	d.pDuel = CreateDuel(int32(seed))
 	SetPlayerInfo(d.pDuel, 0, d.hostInfo.StartLp, int32(d.hostInfo.StartHand), int32(d.hostInfo.DrawCount))
 	SetPlayerInfo(d.pDuel, 1, d.hostInfo.StartLp, int32(d.hostInfo.StartHand), int32(d.hostInfo.DrawCount))
-	opt := d.hostInfo.DuleRule << 16
+	opt := int32(d.hostInfo.DuleRule) << 16
 	if d.hostInfo.NoShuffleDeck {
 		opt |= DUEL_PSEUDO_SHUFFLE
 	}
@@ -664,7 +720,7 @@ func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
 	}
 	d.RefreshExtraDef(0)
 	d.RefreshExtraDef(1)
-	StartDuel(d.pDuel, int32(opt))
+	StartDuel(d.pDuel, opt)
 	if d.hostInfo.TimeLimit != 0 {
 		//TODO 定时器
 	}
@@ -712,18 +768,20 @@ func (d *SingleDuel) Process() {
 		engLen = result & 0xffff
 		engFlag = result >> 16
 		if engLen > 0 {
-			_ = GetMessage(d.pDuel, engineBuffer)
-			stop = d.Analyze(engineBuffer[:engLen])
+			_ = GetMessage(d.pDuel, engineBuffer[3:])
+			stop = d.Analyze(engineBuffer, engLen)
 		}
 	}
 
 }
-func (d *SingleDuel) Analyze(msgbuffer []byte) int {
+
+// Analyze 这里做了特殊处理， msgbuffer前3个自己都是不做使用位。后面才是内容
+func (d *SingleDuel) Analyze(msgbuffer []byte, engLen int32) int {
 
 	var (
-		offset             int
-		pbuf               = &Buffer{buf: msgbuffer}
-		player, count, typ int8
+		offset, pbufw      int
+		pbuf               = &Buffer{buf: msgbuffer[3:engLen]}
+		player, count, typ uint8
 	)
 
 	for pbuf.Len() > 0 {
@@ -733,7 +791,8 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 		fmt.Println("engType", engType)
 		switch engType {
 		case MSG_RETRY:
-			WaitforResponse()
+			d.WaitForResponse(d.LastResponse)
+			SendBufferToPlayer(d.players[d.LastResponse], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
 			return 1
 		case MSG_HINT:
 			fmt.Println("MSG_HINT")
@@ -743,39 +802,326 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 			switch typ {
 			case 1, 2, 3, 5:
 				//发送消息给客户端
-				fmt.Println(msgbuffer[offset : pbuf.Position()-offset])
+				SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+
 			case 4, 6, 7, 8, 9, 11:
+				var resendList []ClientInterface
+				for i := range d.observers {
+					resendList = append(resendList, d.observers[i])
+				}
 				//发送消息给客户端
-				fmt.Println(msgbuffer[offset : pbuf.Position()-offset])
+				SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 			case 10:
 				//发送消息给客户端
-				fmt.Println(msgbuffer[offset : pbuf.Position()-offset])
+				var resendList []ClientInterface
+				resendList = append(resendList, d.players[1])
+				for i := range d.observers {
+					resendList = append(resendList, d.observers[i])
+				}
+				SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 			}
 		case MSG_WIN:
+			fmt.Println("MSG_WIN")
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &typ)
+
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for i := range d.observers {
+				resendList = append(resendList, d.observers[i])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			if player > 1 {
+				d.matchResult[d.duelCount] = uint8(1 - player)
+				d.duelCount++
+				d.tpPlayer = 1 - d.tpPlayer
+			}
+			d.EndDuel()
+			return 2
 		case MSG_SELECT_BATTLECMD:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 11))
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count*8) + 2)
+			d.RefreshMzoneDef(0)
+			d.RefreshMzoneDef(1)
+			d.RefreshSzoneDef(0)
+			d.RefreshSzoneDef(1)
+			d.RefreshHandDef(0)
+			d.RefreshHandDef(1)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_IDLECMD:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 7))
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 7))
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 7))
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 7))
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 7))
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count*11 + 3))
+			d.RefreshMzoneDef(0)
+			d.RefreshMzoneDef(1)
+			d.RefreshSzoneDef(0)
+			d.RefreshSzoneDef(1)
+			d.RefreshHandDef(0)
+			d.RefreshHandDef(1)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_EFFECTYN:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(12)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_YESNO:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(4)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_OPTION:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count * 4))
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_CARD, MSG_SELECT_TRIBUTE:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(3)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			var (
+				c uint8
+				i uint8
+			)
+			for i = 0; i < count; i++ {
+				pbufw = pbuf.Position()
+				pbuf.Next(4) //code
+				_ = binary.Read(pbuf, binary.LittleEndian, &c)
+				pbuf.Next(1) //l
+				pbuf.Next(1) //s
+				pbuf.Next(1) //ss
+				if c != player {
+					binary.LittleEndian.PutUint32(pbuf.OffsetBytes(pbufw), 0)
+				}
+
+			}
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_UNSELECT_CARD:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(4)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			var (
+				c uint8
+				i uint8
+			)
+			for i = 0; i < count; i++ {
+				pbufw = pbuf.Position()
+				pbuf.Next(4) //code
+				_ = binary.Read(pbuf, binary.LittleEndian, &c)
+				pbuf.Next(1) //l
+				pbuf.Next(1) //s
+				pbuf.Next(1) //ss
+				if c != player {
+					binary.LittleEndian.PutUint32(pbuf.OffsetBytes(pbufw), 0)
+				}
+			}
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			for i = 0; i < count; i++ {
+				pbufw = pbuf.Position()
+				pbuf.Next(4) //code
+				_ = binary.Read(pbuf, binary.LittleEndian, &c)
+				pbuf.Next(1) //l
+				pbuf.Next(1) //s
+				pbuf.Next(1) //ss
+				if c != player {
+					binary.LittleEndian.PutUint32(pbuf.OffsetBytes(pbufw), 0)
+				}
+			}
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_CHAIN:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(10 + int(count)*13)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_PLACE, MSG_SELECT_DISFIELD:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(5)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_POSITION:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(5)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_COUNTER:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(4)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 9)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SELECT_SUM:
+			pbuf.Next(1)
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			pbuf.Next(6)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 11)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 11)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_SORT_CARD:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 7)
+			d.WaitForResponse(player)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			return 1
 		case MSG_CONFIRM_DECKTOP:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 7)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for i := range d.observers {
+				resendList = append(resendList, d.observers[i])
+			}
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_CONFIRM_EXTRATOP:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 7)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for i := range d.observers {
+				resendList = append(resendList, d.observers[i])
+			}
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_CONFIRM_CARDS:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			if pbuf.buf[5] != LOCATION_DECK {
+				pbuf.Next(int(count) * 7)
+				var resendList []ClientInterface
+				resendList = append(resendList, d.players[1])
+				for i := range d.observers {
+					resendList = append(resendList, d.observers[i])
+				}
+				SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			} else {
+				pbuf.Next(int(count) * 7)
+				SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			}
 		case MSG_SHUFFLE_DECK:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for i := range d.observers {
+				resendList = append(resendList, d.observers[i])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_SHUFFLE_HAND:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3+int(count)*4])
+			var (
+				i uint8
+			)
+			for ; i < count; i++ {
+				pbuf.Write([]byte{0, 0, 0, 0})
+			}
+			var resendList []ClientInterface
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			d.RefreshHand(d.pDuel, player, 0x781fff, 0)
 		case MSG_SHUFFLE_EXTRA:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			SendBufferToPlayer(d.players[player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3+int(count)*4])
+			var (
+				i uint8
+			)
+			for ; i < count; i++ {
+				pbuf.Write([]byte{0, 0, 0, 0})
+			}
+			var resendList []ClientInterface
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			d.RefreshExtraDef(player)
 		case MSG_REFRESH_DECK:
+			pbuf.Next(1)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_SWAP_GRAVE_DECK:
+			_ = binary.Read(pbuf, binary.LittleEndian, &player)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			d.RefreshGraveDef(player)
 		case MSG_REVERSE_DECK:
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_DECK_TOP:
+			pbuf.Next(6)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_SHUFFLE_SET_CARD:
+			var loc uint8
+			_ = binary.Read(pbuf, binary.LittleEndian, &loc)
+			_ = binary.Read(pbuf, binary.LittleEndian, &count)
+			pbuf.Next(int(count) * 8)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			if loc == LOCATION_MZONE {
+				d.RefreshMzone(d.pDuel, 0, 0x181fff, 0)
+				d.RefreshMzone(d.pDuel, 1, 0x181fff, 0)
+			} else {
+				d.RefreshSzone(d.pDuel, 0, 0x181fff, 0)
+				d.RefreshSzone(d.pDuel, 1, 0x181fff, 0)
+			}
 		case MSG_NEW_TURN:
 			d.RefreshMzoneDef(0)
 			d.RefreshMzoneDef(1)
@@ -785,19 +1131,23 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 			d.RefreshHandDef(1)
 
 			pbuf.Next(1)
-			//			time_limit[0] = host_info.time_limit;
-			//			time_limit[1] = host_info.time_limit;
-			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, append([]byte{0, 0, 0}, msgbuffer[offset:pbuf.Position()-offset]...), d.players[1])
-			//for i:=range d.observers{}
-		//			for(auto oit = observers.begin(); oit != observers.end(); ++oit)
-		//				NetServer::ReSendToPlayer(*oit);
+			d.timeLimit[0] = d.hostInfo.TimeLimit
+			d.timeLimit[1] = d.hostInfo.TimeLimit
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 
 		case MSG_NEW_PHASE:
 			pbuf.Next(2)
-			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, append([]byte{0, 0, 0}, msgbuffer[offset:pbuf.Position()-offset]...), d.players[1])
-
-			//			for(auto oit = observers.begin(); oit != observers.end(); ++oit)
-			//				NetServer::ReSendToPlayer(*oit);
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 			d.RefreshMzoneDef(0)
 			d.RefreshMzoneDef(1)
 			d.RefreshSzoneDef(0)
@@ -806,32 +1156,120 @@ func (d *SingleDuel) Analyze(msgbuffer []byte) int {
 			d.RefreshHandDef(1)
 		case MSG_MOVE:
 
-		//	pbufw := pbuf
-		//	 pc := msgbuffer[4];
-		//	pl := msgbuffer[5];
-		//	/*int ps = pbuf[6];*/
-		//	/*int pp = pbuf[7];*/
-		//	cc := msgbuffer[8];
-		//	cl := msgbuffer[9];
-		//	cs := msgbuffer[10];
-		//	cp := msgbuffer[11];
-		//	pbuf += 16;
-		//NetServer::SendBufferToPlayer(players[cc], STOC_GAME_MSG, offset, pbuf - offset);
-		//	if (!(cl & (LOCATION_GRAVE + LOCATION_OVERLAY)) && ((cl & (LOCATION_DECK + LOCATION_HAND)) || (cp & POS_FACEDOWN)))
-		//		BufferIO::WriteInt32(pbufw, 0);
-		//NetServer::SendBufferToPlayer(players[1 - cc], STOC_GAME_MSG, offset, pbuf - offset);
-		//	for(auto oit = observers.begin(); oit != observers.end(); ++oit)
-		//NetServer::ReSendToPlayer(*oit);
-		//	if (cl != 0 && (cl & LOCATION_OVERLAY) == 0 && (cl != pl || pc != cc))
-		//		RefreshSingle(cc, cl, cs);
+			pbufw = pbuf.Position()
+			pc := pbuf.buf[4]
+
+			pl := pbuf.buf[5]
+			//	/*int ps = pbuf[6];*/
+			//	/*int pp = pbuf[7];*/
+			cc := pbuf.buf[8]
+			cl := pbuf.buf[9]
+			cs := pbuf.buf[10]
+			cp := pbuf.buf[11]
+			pbuf.Next(16)
+			SendBufferToPlayer(d.players[cc], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3])
+			if (cl&(LOCATION_GRAVE+LOCATION_OVERLAY) == 0) && ((cl&(LOCATION_DECK+LOCATION_HAND) != 0) || (cp&POS_FACEDOWN) != 0) {
+				for i := pbufw; i < 4; i++ {
+					pbuf.buf[i] = 0
+				}
+			}
+			var resendList []ClientInterface
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[1-cc], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+
+			if cl != 0 && (cl&LOCATION_OVERLAY) == 0 && (cl != pl || pc != cc) {
+				d.RefreshSingleDef(cc, cl, cs)
+			}
+
 		case MSG_POS_CHANGE:
+			cc := pbuf.buf[4]
+			cl := pbuf.buf[5]
+			cs := pbuf.buf[6]
+			pp := pbuf.buf[7]
+			cp := pbuf.buf[8]
+			pbuf.Next(9)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			if (pp&POS_FACEDOWN != 0) && (cp&POS_FACEUP != 0) {
+				d.RefreshSingleDef(cc, cl, cs)
+			}
 		case MSG_SET:
+			pbuf.Write([]byte{0, 0, 0, 0})
+			pbuf.Next(4)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_SWAP:
+			c1 := pbuf.buf[4]
+			l1 := pbuf.buf[5]
+			s1 := pbuf.buf[6]
+			c2 := pbuf.buf[12]
+			l2 := pbuf.buf[13]
+			s2 := pbuf.buf[14]
+			pbuf.Next(16)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			d.RefreshSingleDef(c1, l1, s1)
+			d.RefreshSingleDef(c2, l2, s2)
 		case MSG_FIELD_DISABLED:
+			pbuf.Next(4)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_SUMMONING:
+			pbuf.Next(8)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
 		case MSG_SUMMONED:
-		case MSG_SPSUMMONING:
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			d.RefreshMzoneDef(0)
+			d.RefreshMzoneDef(1)
+			d.RefreshSzoneDef(0)
+			d.RefreshSzoneDef(1)
 		case MSG_SPSUMMONED:
+			pbuf.Next(8)
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+		case MSG_SPSUMMONING:
+			var resendList []ClientInterface
+			resendList = append(resendList, d.players[1])
+			for j := range d.observers {
+				resendList = append(resendList, d.observers[j])
+			}
+			SendBufferToPlayer(d.players[0], STOC_GAME_MSG, msgbuffer[offset:pbuf.Position()+3], resendList...)
+			d.RefreshMzoneDef(0)
+			d.RefreshMzoneDef(1)
+			d.RefreshSzoneDef(0)
+			d.RefreshSzoneDef(1)
 		//NetServer::SendBufferToPlayer(players[0], STOC_GAME_MSG, offset, pbuf - offset);
 		//NetServer::ReSendToPlayer(players[1]);
 		//	for(auto oit = observers.begin(); oit != observers.end(); ++oit)
@@ -1208,6 +1646,19 @@ func (d *SingleDuel) IsCreator(dp *DuelPlayer) bool {
 func (d *SingleDuel) SetHostInfo(info host.HostInfo) {
 	d.hostInfo = info
 }
-func WaitforResponse() {
-	fmt.Println("等待用户操作")
+func (d *SingleDuel) WaitForResponse(playerId uint8) {
+	d.LastResponse = playerId
+	var msg = make([]byte, 3, 4)
+	msg = append(msg, MSG_WAITING)
+	SendBufferToPlayer(d.players[1-playerId], STOC_GAME_MSG, msg)
+	if d.hostInfo.TimeLimit != 0 {
+		var sctl = stoc.TimeLimit{
+			Player:   playerId,
+			LeftTime: d.timeLimit[playerId],
+		}
+		SendPacketToPlayer(d.players[0], STOC_TIME_LIMIT, sctl, d.players[1])
+		d.players[playerId].Status = CTOS_TIME_CONFIRM
+	} else {
+		d.players[playerId].Status = CTOS_RESPONSE
+	}
 }

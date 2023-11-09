@@ -72,7 +72,17 @@ func (t TypeChange) Marshal() ([]byte, error) {
 //}
 
 type TimeLimit struct {
-	Player uint8
+	Player   uint8
+	LeftTime uint16
+}
+
+func (t TimeLimit) Marshal() ([]byte, error) {
+	b := bytes.NewBuffer(make([]byte, 0, 100))
+	err := binary.Write(b, binary.LittleEndian, &t)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 type Chat struct {
