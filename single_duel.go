@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
 	"github.com/sjm1327605995/go-ygocore/msg/stoc"
 	"math/rand"
@@ -14,53 +15,11 @@ func init() {
 	rand.NewSource(time.Now().UnixNano())
 }
 
-// func main() {
-//
-//		NewDataManager()
-//		RegisterDo()
-//		n := rand.Int31n(10000)
-//
-//		pduel := CreateDuel(n)
-//		duel := &SingleDuel{
-//			players: []ClientInterface{&ConsoleClient{id: 0}, &ConsoleClient{id: 1}},
-//			pduel:   pduel,
-//		}
-//		SetPlayerInfo(pduel, 0, 8000, 5, 1)
-//		SetPlayerInfo(pduel, 1, 8000, 5, 1)
-//		var (
-//			mainCards = []uint32{14124483, 9411399, 9411399, 18094166, 18094166, 18094166, 40044918, 40044918, 59392529, 50720316, 50720316, 27780618, 27780618, 16605586, 16605586, 22865492, 22865492, 23434538, 23434538, 14558127, 14558127,
-//				13650422, 83965310, 81439173, 8949584, 8949584, 32807846, 52947044, 45906428, 24094653, 21143940, 21143940, 21143940, 48130397, 24224830, 24224830, 12071500, 24299458, 24299458, 10045474}
-//			exidCards = []uint32{73580471, 79606837, 79606837, 79606837, 21521304, 27552504, 1174075, 1174075, 1174075, 73898890, 73898890, 72336818, 41999284, 94259633, 94259633}
-//		)
-//		for i := len(mainCards) - 1; i >= 0; i-- {
-//			NewCard(pduel, mainCards[i], 0, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
-//		}
-//		for i := len(exidCards) - 1; i >= 0; i-- {
-//			NewCard(pduel, exidCards[i], 0, 0, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
-//		}
-//		for i := len(mainCards) - 1; i >= 0; i-- {
-//			NewCard(pduel, mainCards[i], 1, 1, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE)
-//		}
-//		for i := len(exidCards) - 1; i >= 0; i-- {
-//			NewCard(pduel, exidCards[i], 1, 1, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)
-//		}
-//		count1 := QueryFieldCount(pduel, 0, 0x1)
-//		count2 := QueryFieldCount(pduel, 0, 0x40)
-//		count3 := QueryFieldCount(pduel, 1, 0x1)
-//		count4 := QueryFieldCount(pduel, 1, 0x40)
-//		fmt.Println(count1, count2, count3, count4)
-//		duel.RefreshExtraDef(0)
-//		duel.RefreshExtraDef(1)
-//		opt := 5 << 16
-//		StartDuel(pduel, int32(opt))
-//
-//		duel.Process()
-//	}
 func (d *SingleDuel) RefreshExtraDef(player uint8) {
 	d.RefreshExtra(d.pDuel, player, 0xe81fff, 1)
 }
 func (d *SingleDuel) RefreshMzoneDef(player uint8) {
-	d.RefreshExtra(d.pDuel, player, 0x881fff, 1)
+	d.RefreshMzone(d.pDuel, player, 0x881fff, 1)
 }
 
 func (d *SingleDuel) RefreshSzoneDef(player uint8) {
@@ -76,20 +35,18 @@ func (d *SingleDuel) RefreshSingleDef(player uint8, location uint8, seq uint8) {
 	d.RefreshSingle(player, location, seq, 0xf81fff)
 }
 
-// void RefreshSingle(int player, int location, int sequence, int flag = 0xf81fff);
-// void RefreshGrave(int player, int flag = 0x81fff, int use_cache = 1);
 func (d *SingleDuel) RefreshMzone(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshMzone")
 	var (
-		originBuf = make([]byte, 0x2000)
-		qbuf      = originBuf[3:]
+		originBuf = byteslice.Get(0x2000)
+		qbuf      = originBuf[6:]
 	)
-
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = LOCATION_MZONE
+	defer byteslice.Put(originBuf)
+	originBuf[3] = MSG_UPDATE_DATA
+	originBuf[4] = player
+	originBuf[5] = LOCATION_MZONE
 	length := QueryFieldCard(pdule, player, LOCATION_MZONE, flag, qbuf, use_cache)
-	SendBufferToPlayer(d.players[player], STOC_GAME_MSG, qbuf[:length])
+	SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
 	var (
 		qlen   int32
 		clen   int32
@@ -121,14 +78,15 @@ func (d *SingleDuel) RefreshMzone(pdule uintptr, player uint8, flag, use_cache i
 
 func (d *SingleDuel) RefreshSzone(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshSzone")
-	var (
-		originBuf = make([]byte, 0x2000)
-		qbuf      = originBuf[3:]
-	)
 
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = LOCATION_SZONE
+	var (
+		originBuf = byteslice.Get(0x2000)
+		qbuf      = originBuf[6:]
+	)
+	defer byteslice.Put(originBuf)
+	originBuf[3] = MSG_UPDATE_DATA
+	originBuf[4] = player
+	originBuf[5] = LOCATION_SZONE
 	length := QueryFieldCard(pdule, player, LOCATION_SZONE, flag, qbuf, use_cache)
 	SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
 	var (
@@ -156,20 +114,20 @@ func (d *SingleDuel) RefreshSzone(pdule uintptr, player uint8, flag, use_cache i
 	for i := range d.observers {
 		list = append(list, d.observers[i])
 	}
-	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, qbuf[:length], list...)
+	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, originBuf[:length+6], list...)
 
 }
 func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshHand")
 	var (
-		originBuf = make([]byte, 0x2000)
-		qbuf      = originBuf[3:]
+		originBuf = byteslice.Get(0x2000)
+		qbuf      = originBuf[6:]
 	)
-
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = LOCATION_HAND
-	length := QueryFieldCard(pdule, player, LOCATION_HAND, flag|QUERY_POSITION, qbuf[3:], use_cache)
+	defer byteslice.Put(originBuf)
+	originBuf[3] = MSG_UPDATE_DATA
+	originBuf[4] = player
+	originBuf[5] = LOCATION_HAND
+	length := QueryFieldCard(pdule, player, LOCATION_HAND, flag|QUERY_POSITION, qbuf, use_cache)
 	SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
 	var (
 		qlen   int32
@@ -203,20 +161,20 @@ func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache in
 	for i := range d.observers {
 		list = append(list, d.observers[i])
 	}
-	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, qbuf[:length], list...)
+	SendBufferToPlayer(d.players[1-player], STOC_GAME_MSG, originBuf[:length+6], list...)
 
 }
 func (d *SingleDuel) RefreshGrave(pdule uintptr, player uint8, flag, use_cache int32) {
 	fmt.Println("RefreshGrave")
 	var (
-		originBuf = make([]byte, 0x2000)
-		qbuf      = originBuf[3:]
+		originBuf = byteslice.Get(0x2000)
+		qbuf      = originBuf[6:]
 	)
-
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = LOCATION_GRAVE
-	length := QueryFieldCard(pdule, player, LOCATION_GRAVE, flag, qbuf[3:], use_cache)
+	defer byteslice.Put(originBuf)
+	originBuf[3] = MSG_UPDATE_DATA
+	originBuf[4] = player
+	originBuf[5] = LOCATION_GRAVE
+	length := QueryFieldCard(pdule, player, LOCATION_GRAVE, flag, qbuf, use_cache)
 	var list []ClientInterface
 	list = append(list, d.players[1])
 	for i := range d.observers {
@@ -226,15 +184,18 @@ func (d *SingleDuel) RefreshGrave(pdule uintptr, player uint8, flag, use_cache i
 
 }
 func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache int32) {
+
 	fmt.Println("RefreshExtra")
 	var (
-		originBuf = make([]byte, 0x2000)
-		qbuf      = originBuf[3:]
+		originBuf = byteslice.Get(0x2000)
+		qbuf      = originBuf[6:]
 	)
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = LOCATION_EXTRA
-	length := QueryFieldCard(pdule, player, LOCATION_EXTRA, flag, qbuf[3:], use_cache)
+	defer byteslice.Put(originBuf)
+	originBuf[3] = MSG_UPDATE_DATA
+	originBuf[4] = player
+	originBuf[5] = LOCATION_GRAVE
+
+	length := QueryFieldCard(pdule, player, LOCATION_EXTRA, flag, qbuf, use_cache)
 
 	_ = SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
 
@@ -243,14 +204,15 @@ func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache i
 func (d *SingleDuel) RefreshSingle(player uint8, location uint8, sequence uint8, flag int32) {
 	fmt.Println("RefreshSingle")
 	var (
-		originBuf = make([]byte, 0x2000)
-		qbuf      = originBuf[3:]
+		originBuf = byteslice.Get(0x2000)
+		qbuf      = originBuf[7:]
 	)
-	qbuf[0] = MSG_UPDATE_DATA
-	qbuf[1] = player
-	qbuf[2] = location
-	qbuf[3] = sequence
-	length := QueryFieldCard(d.pDuel, player, LOCATION_GRAVE, flag|QUERY_POSITION, qbuf[3:], 0)
+	defer byteslice.Put(originBuf)
+	originBuf[3] = MSG_UPDATE_DATA
+	originBuf[4] = player
+	originBuf[5] = location
+	originBuf[6] = sequence
+	length := QueryFieldCard(d.pDuel, player, LOCATION_GRAVE, flag|QUERY_POSITION, qbuf, 0)
 	SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+7])
 	if location == LOCATION_REMOVED && (qbuf[15]&POS_FACEDOWN) != 0 {
 		return
@@ -780,7 +742,7 @@ func (d *SingleDuel) Analyze(msgbuffer []byte, engLen int32) int {
 
 	var (
 		offset, pbufw      int
-		pbuf               = &Buffer{buf: msgbuffer[3:engLen]}
+		pbuf               = &Buffer{buf: msgbuffer[3 : engLen+3]}
 		player, count, typ uint8
 	)
 
@@ -1403,25 +1365,21 @@ func (d *SingleDuel) Analyze(msgbuffer []byte, engLen int32) int {
 			_ = binary.Read(pbuf, binary.LittleEndian, &player)
 			_ = binary.Read(pbuf, binary.LittleEndian, &count)
 			fmt.Println("MSG_DRAW", player, count)
-			var cards = make([]uint32, count)
-			_ = binary.Read(pbuf, binary.LittleEndian, &cards)
-
+			pbufw = pbuf.Position()
+			pbuf.Next(int(count) * 4)
 			SendPacketToPlayer(d.players[player], STOC_GAME_MSG, BytesPacket(pbuf.OffsetBytes(offset)))
-			index := 3
+
 			for i := 0; i < int(count); i++ {
-				if msgbuffer[index+3]&0x80 == 0 {
-					for j := 0; j < 4; j++ {
-						msgbuffer[index+j] = 0
-					}
+				if pbuf.buf[pbufw+3]&0x80 == 0 {
+					binary.LittleEndian.PutUint32(pbuf.buf[pbufw:], 0)
 				}
-				index += 4
+				pbufw += 4
+
 			}
 			SendPacketToPlayer(d.players[1-player], STOC_GAME_MSG, BytesPacket(pbuf.OffsetBytes(offset)))
 			for i := range d.observers {
 				SendPacketToPlayer(d.observers[i], STOC_GAME_MSG, BytesPacket(pbuf.OffsetBytes(offset)))
 			}
-			//for(auto oit = observers.begin(); oit != observers.end(); ++oit)
-		//NetServer::ReSendToPlayer(*oit);
 
 		case MSG_DAMAGE:
 		//	pbuf += 5;

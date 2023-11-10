@@ -22,6 +22,7 @@ type DuelPlayer struct {
 }
 
 func (d DuelPlayer) Write(arr []byte) error {
+
 	switch d.Protocol {
 	case TCP:
 		_, err := d.Conn.Write(arr)

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet/v2"
+	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"sync"
 	"time"
@@ -23,7 +24,6 @@ type Server struct {
 	multicore bool
 	eng       gnet.Engine
 	goPool    *ants.Pool
-	bytesPool *BytesPool
 }
 
 type BytesPool struct {
@@ -55,8 +55,7 @@ func NewServer() *Server {
 		panic(err)
 	}
 	return &Server{
-		goPool:    goPool,
-		bytesPool: NewBytesPool(),
+		goPool: goPool,
 	}
 }
 
@@ -74,9 +73,11 @@ func (wss *Server) OnOpen(c gnet.Conn) ([]byte, gnet.Action) {
 		Protocol: TCP,
 		Conn:     c,
 	}
-	ctx.ticker = time.NewTicker(time.Second * 3)
+
 	ctx.netServer = &NetServer{
-		queue: make(chan *bytes.Buffer, 50),
+		queue:  make(chan int, 50),
+		Buffer: bytes.NewBuffer(make([]byte, 2048)),
+		ring:   new(elastic.RingBuffer),
 	}
 	err := wss.goPool.Submit(func() {
 		ctx.netServer.HandleCTOSPacket(ctx.dp)
@@ -120,10 +121,10 @@ func (wss *Server) OnTraffic(c gnet.Conn) (action gnet.Action) {
 		if err != nil {
 			return gnet.Close
 		}
+		//每个buffer都会有个环形buffer 重复使用 。并发的时候，直接快速把消息先转存到环中，无锁使用
+		_, _ = ctx.netServer.ring.Write(arr[2:])
 
-		buff := wss.bytesPool.Get()
-		buff.Write(arr[2:])
-		ctx.netServer.queue <- buff
+		ctx.netServer.queue <- ctx.msgLen
 
 		if err != nil {
 			return gnet.Close
@@ -151,5 +152,4 @@ type Context struct {
 	msgLen    int
 	dp        *DuelPlayer
 	netServer *NetServer
-	ticker    *time.Ticker
 }

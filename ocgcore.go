@@ -13,6 +13,7 @@ import "C"
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"unsafe"
 )
 
@@ -45,7 +46,20 @@ func init() {
 		// 将 uintptr 转换为 int64 这里暂时不需要打印日志，所以不写该方法
 		//value := int64(uintptr(data))
 		//return nil
-		fmt.Println("messageHandler")
+		// 将 unsafe.Pointer 转换为 uintptr
+		// 将 unsafe.Pointer 转换为 uintptr
+		ptrUint := uintptr(data)
+
+		// 使用 reflect.SliceHeader 将 uintptr 转换为切片
+		var sliceHeader reflect.SliceHeader
+		sliceHeader.Data = ptrUint
+		sliceHeader.Len = 50 // 数组的长度
+		sliceHeader.Cap = 50 // 切片的容量
+
+		// 转换切片为 []byte
+		bytes := *(*[]byte)(unsafe.Pointer(&sliceHeader))
+
+		fmt.Println("messageHandler", string(bytes))
 	}
 
 	cardReader = func(cardID uint32, card *CardDataC) bool {
@@ -117,7 +131,6 @@ func goCardReader(cardID C.uint32_t, data *C.card_data) C.uint32_t {
 
 func CreateDuel(seed int32) uintptr {
 	pDuel := C.create_duel(C.int(seed))
-	fmt.Println(pDuel)
 	return uintptr(pDuel)
 }
 func StartDuel(pduel uintptr, options int32) {

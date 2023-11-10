@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	"github.com/sjm1327605995/go-ygocore/msg/ctos"
 	"github.com/sjm1327605995/go-ygocore/msg/host"
 	"github.com/sjm1327605995/go-ygocore/msg/stoc"
@@ -10,18 +11,33 @@ import (
 )
 
 type NetServer struct {
-	queue chan *bytes.Buffer
+	queue  chan int
+	ring   *elastic.RingBuffer
+	Buffer *bytes.Buffer
 }
 
 // HandleCTOSPacket 重构dp结构体优化调用链
-func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
-	for buff := range n.queue {
-		func() {
-			defer func() {
+func (ns *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 
+	for total := range ns.queue {
+
+		func(length int) {
+
+			ns.Buffer.Reset()
+			if ns.ring.IsEmpty() {
+				return
+			}
+			head, tail := ns.ring.Peek(length)
+			defer func() {
+				_, _ = ns.ring.Discard(length)
 			}()
-			length := buff.Len()
-			pktType, _ := buff.ReadByte()
+			if len(head) >= length {
+				ns.Buffer.Write(head[:length])
+			} else {
+				ns.Buffer.Write(head)
+				ns.Buffer.Write(tail[:total-len(head)])
+			}
+			pktType, _ := ns.Buffer.ReadByte()
 			if (pktType != ctos.CTOS_SURRENDER) && (pktType != ctos.CTOS_CHAT) && (dp.Status == 0xff || (dp.Status != 0 && dp.Status != pktType)) {
 				return
 			}
@@ -37,7 +53,7 @@ func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 				} else {
 					n = length - 1
 				}
-				dp.game.GetResponse(dp, buff.Next(n))
+				dp.game.GetResponse(dp, ns.Buffer.Next(n))
 			case ctos.CTOS_TIME_CONFIRM:
 				if dp.game == nil || dp.game.PDuel() == 0 {
 					return
@@ -47,26 +63,26 @@ func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 				if dp.game == nil {
 					return
 				}
-				dp.game.Chat(dp, buff.Bytes())
+				dp.game.Chat(dp, ns.Buffer.Bytes())
 			case ctos.CTOS_UPDATE_DECK:
 				if dp.game == nil {
 					return
 				}
 
-				dp.game.UpdateDeck(dp, buff.Bytes())
+				dp.game.UpdateDeck(dp, ns.Buffer.Bytes())
 			case ctos.CTOS_HAND_RESULT:
 				if dp.game == nil {
 					return
 				}
 				var res ctos.HandResult
-				res.Parse(buff)
+				res.Parse(ns.Buffer)
 				dp.game.HandResult(dp, res.Res)
 			case ctos.CTOS_TP_RESULT:
 				if dp.game == nil {
 					return
 				}
 				var res ctos.TPResult
-				err := res.Parse(buff)
+				err := res.Parse(ns.Buffer)
 				if err != nil {
 					return
 				}
@@ -74,14 +90,14 @@ func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 			case ctos.CTOS_PLAYER_INFO:
 				fmt.Println("CTOS_PLAYER_INFO")
 				var pkt ctos.PlayerInfo
-				_ = pkt.Parse(buff)
+				_ = pkt.Parse(ns.Buffer)
 				dp.Name = pkt.Name
 			case ctos.CTOS_CREATE_GAME: //TODO 暂时请求未使用到 比较疑惑
 				if dp.game != nil || dp.game == nil {
 					return
 				}
 				var pkt ctos.CreateGame
-				pkt.Parse(buff)
+				pkt.Parse(ns.Buffer)
 
 				arr := make([]byte, len(pkt.Name))
 				for i := range dp.Name {
@@ -140,7 +156,7 @@ func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 					TimeLimit:     180,
 				}
 				var pkt ctos.JoinGame
-				err := pkt.Parse(buff)
+				err := pkt.Parse(ns.Buffer)
 				if err != nil {
 					var scem stoc.ErrorMsg
 					scem.Msg = ERRMSG_JOINERROR
@@ -192,7 +208,7 @@ func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 				}
 
 				var pkt ctos.Kick
-				pkt.Parse(buff)
+				pkt.Parse(ns.Buffer)
 				dp.game.PlayerKick(dp, pkt.Pos)
 			case CTOS_HS_START:
 				if dp.game == nil || dp.game.PDuel() != 0 {
@@ -200,7 +216,7 @@ func (n *NetServer) HandleCTOSPacket(dp *DuelPlayer) {
 				}
 				dp.game.StartDuel(dp)
 			}
-		}()
+		}(total)
 	}
 }
 func WSStr(bytes []byte) string {
