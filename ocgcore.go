@@ -13,20 +13,19 @@ import "C"
 import (
 	"fmt"
 	"os"
-	"reflect"
 	"unsafe"
 )
 
 var (
 	scriptReader   func(name string) []byte
-	messageHandler func(data unsafe.Pointer, tp int32)
+	messageHandler func(data uintptr, tp int32)
 	cardReader     func(cardID uint32, card *CardDataC) bool
 )
 
 func RegisterScriptReader(f func(name string) []byte) {
 	scriptReader = f
 }
-func RegisterMessageHandler(f func(data unsafe.Pointer, tp int32)) {
+func RegisterMessageHandler(f func(pduel uintptr, tp int32)) {
 	messageHandler = f
 }
 func RegisterCardReader(f func(cardID uint32, card *CardDataC) bool) {
@@ -39,27 +38,14 @@ func RegisterDo() {
 }
 func init() {
 	scriptReader = func(name string) []byte {
-		bytes, _ := os.ReadFile(name)
+		n := "../ygopro-scripts/" + name[9:]
+		bytes, _ := os.ReadFile(n)
 		return bytes
 	}
-	messageHandler = func(data unsafe.Pointer, tp int32) {
-		// 将 uintptr 转换为 int64 这里暂时不需要打印日志，所以不写该方法
-		//value := int64(uintptr(data))
-		//return nil
-		// 将 unsafe.Pointer 转换为 uintptr
-		// 将 unsafe.Pointer 转换为 uintptr
-		ptrUint := uintptr(data)
+	messageHandler = func(pduel uintptr, tp int32) {
 
-		// 使用 reflect.SliceHeader 将 uintptr 转换为切片
-		var sliceHeader reflect.SliceHeader
-		sliceHeader.Data = ptrUint
-		sliceHeader.Len = 50 // 数组的长度
-		sliceHeader.Cap = 50 // 切片的容量
-
-		// 转换切片为 []byte
-		bytes := *(*[]byte)(unsafe.Pointer(&sliceHeader))
-
-		fmt.Println("messageHandler", string(bytes))
+		msg := GetLogMessage(pduel)
+		fmt.Println("log", string(msg))
 	}
 
 	cardReader = func(cardID uint32, card *CardDataC) bool {
@@ -86,8 +72,8 @@ func goScriptReader(scriptName *C.char, slen *C.int) *C.uchar {
 }
 
 //export goMessageHandler
-func goMessageHandler(data unsafe.Pointer, size C.uint32_t) {
-	messageHandler(data, int32(size))
+func goMessageHandler(data C.longlong, size C.uint32_t) {
+	messageHandler(uintptr(data), int32(size))
 	// 处理消息
 }
 
@@ -126,6 +112,7 @@ func goCardReader(cardID C.uint32_t, data *C.card_data) C.uint32_t {
 		data.rscale = C.uint32_t(0)
 		data.link_marker = C.uint32_t(0)
 	}
+	fmt.Println(data)
 	return 0
 }
 

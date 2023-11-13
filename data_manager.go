@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/sjm1327605995/go-ygocore/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -88,6 +89,7 @@ func getDataForCore(code uint32, pdata *CardDataC) bool {
 
 	val, ok := DataCache.datas[int32(code)]
 	if !ok {
+		fmt.Println("getCode", code)
 		return false
 	}
 

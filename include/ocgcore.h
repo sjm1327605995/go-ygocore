@@ -33,7 +33,7 @@ uint32_t link_marker;
 }card_data;
 typedef unsigned char*  (*script_reader)(const char*, int*);
 typedef uint32_t (*card_reader)(uint32_t, card_data*);
-typedef uint32_t (*message_handler)(void*, uint32_t);
+typedef uint32_t (*message_handler)(intptr_t, uint32_t);
 extern void set_script_reader(script_reader f);
 extern void set_card_reader(card_reader f);
 extern void set_message_handler(message_handler f);
@@ -42,6 +42,6 @@ extern void set_message_handler(message_handler f);
 
 // 导出Go函数供C调用
 extern unsigned char* goScriptReader(char* data, int *size);
-extern void goMessageHandler(void* data, uint32_t size);
+extern void goMessageHandler(intptr_t  pduel, uint32_t size);
 extern uint32_t goCardReader(uint32_t card_id,  card_data* data);
 #endif  // OCGCORE_H
