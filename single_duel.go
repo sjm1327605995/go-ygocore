@@ -142,15 +142,18 @@ func (d *SingleDuel) RefreshHand(pdule uintptr, player uint8, flag, use_cache in
 		)
 		_ = binary.Read(buffer, binary.LittleEndian, &slen)
 		qflag = binary.LittleEndian.Uint32(buffer.Bytes())
-		if qflag&QUERY_CODE == 0 {
+		if qflag&1 == 0 {
 			offset -= 4
 		}
-		buffer.Next(offset)
 
-		position := (int32(binary.LittleEndian.Uint32(buffer.Bytes())) >> 24) & 0xff
-		if position&POS_FACEUP == 0 {
-			for i := 0; i < 4; i++ {
-				qbuf[i] = 0
+		position := (int32(binary.LittleEndian.Uint32(buffer.Bytes()[offset:])) >> 24) & 0xff
+		if position&5 == 0 {
+			var (
+				i   int32
+				arr = buffer.Bytes()
+			)
+			for ; i < slen-4; i++ {
+				arr[i] = 0
 			}
 		}
 
@@ -193,12 +196,17 @@ func (d *SingleDuel) RefreshExtra(pdule uintptr, player uint8, flag, use_cache i
 	defer byteslice.Put(originBuf)
 	originBuf[3] = MSG_UPDATE_DATA
 	originBuf[4] = player
-	originBuf[5] = LOCATION_GRAVE
+	originBuf[5] = LOCATION_EXTRA
 
 	length := QueryFieldCard(pdule, player, LOCATION_EXTRA, flag, qbuf, use_cache)
 
 	_ = SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
 
+	for i := 1; i < len(qbuf); i++ {
+		qbuf[i] = 0
+	}
+	originBuf[4] = 1 - player
+	_ = SendBufferToPlayer(d.players[player], STOC_GAME_MSG, originBuf[:length+6])
 }
 
 func (d *SingleDuel) RefreshSingle(player uint8, location uint8, sequence uint8, flag int32) {
@@ -670,7 +678,7 @@ func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
 	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 1, 0x1)))
 	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 1, 0x40)))
 	SendBufferToPlayer(d.players[0], STOC_GAME_MSG, startBuf[:19])
-	startBuf[1] = 0x10
+	startBuf[1] = 1
 	SendBufferToPlayer(d.players[1], STOC_GAME_MSG, startBuf[:19])
 	if swapped {
 		startBuf[1] = 0x10
@@ -681,7 +689,9 @@ func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
 		SendBufferToPlayer(d.observers[i], STOC_GAME_MSG, startBuf[:19])
 	}
 	d.RefreshExtraDef(0)
+
 	d.RefreshExtraDef(1)
+
 	StartDuel(d.pDuel, opt)
 	if d.hostInfo.TimeLimit != 0 {
 		//TODO 定时器

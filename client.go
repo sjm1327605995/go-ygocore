@@ -10,6 +10,7 @@ import (
 type ClientInterface interface {
 	Write([]byte) error
 	Close() error
+	GetPos() uint8
 }
 
 type Packet interface {
@@ -37,7 +38,7 @@ func SendBufferToPlayer(c ClientInterface, MSG uint8, buff []byte, resend ...Cli
 
 	binary.LittleEndian.PutUint16(buff, uint16(len(buff)-2))
 	buff[2] = MSG
-	fmt.Println(MSG, hex.EncodeToString(buff))
+	fmt.Println(c.GetPos(), hex.EncodeToString(buff))
 	err := c.Write(buff)
 	if err != nil {
 		return err

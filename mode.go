@@ -25,11 +25,15 @@ func (d DuelPlayer) Write(arr []byte) error {
 
 	switch d.Protocol {
 	case TCP:
+
 		_, err := d.Conn.Write(arr)
 		return err
 	case WS:
 	}
 	return nil
+}
+func (d DuelPlayer) GetPos() uint8 {
+	return d.Pos
 }
 func (d DuelPlayer) Close() error {
 	return d.Conn.Close()
