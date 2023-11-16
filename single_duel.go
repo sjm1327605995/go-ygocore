@@ -670,20 +670,20 @@ func (d *SingleDuel) TPResult(dp *DuelPlayer, tp uint8) {
 	}
 	//last_replay.Flush();
 	var startBuf = make([]byte, 3, 34)
-	startBuf = append(startBuf, 0, d.hostInfo.DuleRule)
+	startBuf = append(startBuf, MSG_START, d.hostInfo.DuleRule)
 	binary.LittleEndian.AppendUint32(startBuf, uint32(d.hostInfo.StartLp))
 	binary.LittleEndian.AppendUint32(startBuf, uint32(d.hostInfo.StartLp))
 	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 0, 0x1)))
 	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 0, 0x40)))
 	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 1, 0x1)))
 	binary.LittleEndian.AppendUint16(startBuf, uint16(QueryFieldCount(d.pDuel, 1, 0x40)))
-	SendBufferToPlayer(d.players[0], STOC_GAME_MSG, startBuf[:19])
-	startBuf[1] = 1
-	SendBufferToPlayer(d.players[1], STOC_GAME_MSG, startBuf[:19])
+	SendBufferToPlayer(d.players[0], STOC_GAME_MSG, startBuf[:22])
+	startBuf[4] = 1
+	SendBufferToPlayer(d.players[1], STOC_GAME_MSG, startBuf[:22])
 	if swapped {
-		startBuf[1] = 0x10
+		startBuf[4] = 0x10
 	} else {
-		startBuf[1] = 0x11
+		startBuf[4] = 0x11
 	}
 	for i := range d.observers {
 		SendBufferToPlayer(d.observers[i], STOC_GAME_MSG, startBuf[:19])
