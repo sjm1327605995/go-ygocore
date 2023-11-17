@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/gobwas/ws v1.3.0
+	github.com/itchio/lzma v0.0.0-20190703113020-d3e24e3e3d49
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/panjf2000/ants/v2 v2.8.2
 	github.com/panjf2000/gnet/v2 v2.3.3
