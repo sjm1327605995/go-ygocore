@@ -1,9 +1,11 @@
-### 调用ocgcore动态库
+### use  ocgcore  Dynamic libraries
 
 
 ### api
 
   ```
+NewYGOCore(libPath string, scriptReader ScriptReader, CardReader CardReader, msgHandler MessageHandler) *YGOCore
+
 
 type ScriptReader func(scriptName string) (data []byte)
 type MessageHandler func(msg string)
