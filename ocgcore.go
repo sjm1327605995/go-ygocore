@@ -1,185 +1,168 @@
 package ygocore
 
-import "C"
-
 /*
-#include "ocgcore.h"
+typedef struct {
+unsigned int code;
+unsigned int alias;
+unsigned int setcode;
+unsigned int type;
+unsigned int level;
+unsigned int attribute;
+unsigned int race;
+long attack;
+long defense;
+unsigned int lscale;
+unsigned int rscale;
+unsigned int link_marker;
+}card_data;
 */
 import "C"
+
 import (
-	"log"
-	"unsafe"
+	"bytes"
+	"github.com/ebitengine/purego"
+	"github.com/sjm1327605995/go-ygocore/core"
 )
 
-var (
-	scriptReader   func(name string) []byte
-	messageHandler func(data unsafe.Pointer, tp int32)
-	cardReader     func(cardID uint32, card *CardDataC) bool
-)
+type CardData struct {
+	Code       uint32 `gorm:"column:id"`
+	Ot         uint32 `gorm:"column:ot"`
+	Alias      uint32 `gorm:"column:alias"`
+	SetCode    uint64 `gorm:"column:setcode"`
+	Typ        int32  `gorm:"column:type"`
+	Level      uint32 `gorm:"column:level"`
+	Race       uint32 `gorm:"column:race"`
+	Attribute  uint32 `gorm:"column:attribute"`
+	Attack     int32  `gorm:"column:atk"`
+	Defense    int32  `gorm:"column:def"`
+	Lscale     uint32 `gorm:"-"`
+	Rscale     uint32 `gorm:"-"`
+	LinkMarker int32  `gorm:"-"`
+	//
+	//	Category int
+}
 
-func RegisterScriptReader(f func(name string) []byte) {
-	scriptReader = f
-}
-func RegisterMessageHandler(f func(data unsafe.Pointer, tp int32)) {
-	messageHandler = f
-}
-func RegisterCardReader(f func(cardID uint32, card *CardDataC) bool) {
-	cardReader = f
-}
-func init() {
-	scriptReader = func(name string) []byte {
-		log.Println("script", name)
-		return nil
+func NewYGOCore(libPath string, scriptReader ScriptReader, CardReader CardReader, msgHandler MessageHandler) *YGOCore {
+	libc, err := core.LoadLib(libPath)
+	if err != nil {
+		panic(err)
 	}
-	messageHandler = func(data unsafe.Pointer, tp int32) {
-		// 将 uintptr 转换为 int64 这里暂时不需要打印日志，所以不写该方法
-		//value := int64(uintptr(data))
-		//return nil
+	if scriptReader == nil {
+		panic("scriptReader is nil")
 	}
-	cardReader = func(cardID uint32, card *CardDataC) bool {
-		return false
+	if CardReader == nil {
+		panic("CardReader is nil")
 	}
-}
-
-type CardDataC struct {
-	code        uint32
-	alias       uint32
-	setcode     uint64
-	typ         uint32
-	level       uint32
-	attribute   uint32
-	race        uint32
-	attack      int32
-	defense     int32
-	lscale      uint32
-	rscale      uint32
-	link_marker uint32
-	ot          uint32
-	category    int
-}
-
-//export goScriptReader
-func goScriptReader(scriptName *C.char, slen *C.int) *C.uchar {
-	// 将C字符串转换为Go字符串
-
-	*slen = 0
-	// 调用适当的函数读取脚本内容
-	data := scriptReader(C.GoString(scriptName))
-	if len(data) == 0 {
-		// 处理错误
-		return (*C.uchar)(nil)
+	if msgHandler == nil {
+		panic("msgHandler is nil")
 	}
-	// 将数据长度设置到slen指针
-	*slen = C.int(len(data))
-	// 创建C字节数组并将数据复制到其中
-	return (*C.uchar)(C.CBytes(data))
-
-}
-
-//export goMessageHandler
-func goMessageHandler(data unsafe.Pointer, size C.uint32_t) {
-	messageHandler(data, int32(size))
-	// 处理消息
-}
-
-//export goCardReader
-func goCardReader(cardID C.uint32_t, data *C.card_data) C.uint32_t {
-
-	//TODO 这里进行了内存拷贝需要重新操作下
-	var (
-		dataC CardDataC
-	)
-	if cardReader(uint32(cardID), &dataC) {
-		data.code = C.uint32_t(dataC.code)
-		data.alias = C.uint32_t(dataC.alias)
-		data.setcode = C.uint64_t(dataC.setcode)
-		data._type = C.uint32_t(dataC.typ)
-		data.level = C.uint32_t(dataC.level)
-		data.attribute = C.uint32_t(dataC.attribute)
-		data.race = C.uint32_t(dataC.race)
-		data.attack = C.int32_t(dataC.attack)
-		data.defense = C.int32_t(dataC.defense)
-		data.lscale = C.uint32_t(dataC.lscale)
-		data.rscale = C.uint32_t(dataC.rscale)
-		data.link_marker = C.uint32_t(dataC.link_marker)
-
-	} else {
-		data.code = C.uint32_t(0)
-		data.alias = C.uint32_t(0)
-		data.setcode = C.uint64_t(0)
-		data._type = C.uint32_t(0)
-		data.level = C.uint32_t(0)
-		data.attribute = C.uint32_t(0)
-		data.race = C.uint32_t(0)
-		data.attack = C.int32_t(0)
-		data.defense = C.int32_t(0)
-		data.lscale = C.uint32_t(0)
-		data.rscale = C.uint32_t(0)
-		data.link_marker = C.uint32_t(0)
+	var ygoCore = &YGOCore{
+		ScriptReader:   scriptReader,
+		CardReader:     CardReader,
+		MessageHandler: msgHandler,
 	}
-	return 0
+
+	purego.RegisterLibFunc(&ygoCore.CreateDuel, libc, "create_duel")
+	purego.RegisterLibFunc(&ygoCore.StartDuel, libc, "start_duel")
+	purego.RegisterLibFunc(&ygoCore.EndDuel, libc, "end_duel")
+	purego.RegisterLibFunc(&ygoCore.SetPlayerInfo, libc, "set_player_info")
+	purego.RegisterLibFunc(&ygoCore.GetLogMessage, libc, "get_log_message")
+	purego.RegisterLibFunc(&ygoCore.GetMessage, libc, "get_message")
+	purego.RegisterLibFunc(&ygoCore.Process, libc, "process")
+	purego.RegisterLibFunc(&ygoCore.NewCard, libc, "new_card")
+	purego.RegisterLibFunc(&ygoCore.QueryCard, libc, "query_card")
+	purego.RegisterLibFunc(&ygoCore.QueryFieldCount, libc, "query_field_count")
+	purego.RegisterLibFunc(&ygoCore.QueryFieldCard, libc, "query_field_card")
+	purego.RegisterLibFunc(&ygoCore.QueryFieldInfo, libc, "query_field_info")
+	purego.RegisterLibFunc(&ygoCore.SetResponseI, libc, "set_responsei")
+	purego.RegisterLibFunc(&ygoCore.SetResponseB, libc, "set_responseb")
+	purego.RegisterLibFunc(&ygoCore.PreloadScript, libc, "preload_script")
+
+	purego.RegisterLibFunc(&ygoCore.setScriptReader, libc, "set_script_reader")
+	purego.RegisterLibFunc(&ygoCore.setCardReader, libc, "set_card_reader")
+	purego.RegisterLibFunc(&ygoCore.setMessageHandler, libc, "set_message_handler")
+	scriptReaderLib := func(scriptName *C.char, slen *C.int) *C.uchar {
+		*slen = 0
+		scriptNameStr := C.GoString(scriptName)
+		// 调用适当的函数读取脚本内容
+		data := ygoCore.ScriptReader(scriptNameStr)
+		if len(data) == 0 {
+			// 处理错误
+			return (*C.uchar)(nil)
+		}
+
+		// 将数据长度设置到slen指针
+		*slen = C.int(len(data))
+		// 创建C字节数组并将数据复制到其中
+		return (*C.uchar)(C.CBytes(data))
+	}
+
+	scriptReaderCb := purego.NewCallback(scriptReaderLib)
+
+	ygoCore.setScriptReader(scriptReaderCb)
+
+	cardReaderLib := func(cardId uint, card *C.card_data) uint {
+		data := ygoCore.CardReader(int32(cardId))
+		if data != nil {
+			card.code = C.uint(data.Code)
+			card.alias = C.uint(data.Alias)
+			card.setcode = C.uint(data.SetCode)
+			card._type = C.uint(data.Typ)
+			card.level = C.uint(data.Level)
+			card.attribute = C.uint(data.Attribute)
+			card.race = C.uint(data.Race)
+			card.attack = C.long(data.Attack)
+			card.defense = C.long(data.Defense)
+			card.lscale = C.uint(data.Lscale)
+			card.rscale = C.uint(data.Rscale)
+			card.link_marker = C.uint(data.LinkMarker)
+		}
+
+		return cardId
+	}
+	cardReaderCb := purego.NewCallback(cardReaderLib)
+	ygoCore.setCardReader(cardReaderCb)
+
+	msgHandlerLib := func(u uintptr, u2 uint32) uint {
+		var buf = make([]byte, 256)
+		ygoCore.GetLogMessage(u, buf)
+		index := bytes.IndexByte(buf, 0)
+		if index > 0 {
+			buf = buf[:index]
+		}
+		ygoCore.MessageHandler(string(buf))
+		return 0
+	}
+
+	msgHandlerCb := purego.NewCallback(msgHandlerLib)
+	ygoCore.setMessageHandler(msgHandlerCb)
+	return ygoCore
+
 }
 
-func CreateGame(seed int32) uintptr {
-	pDuel := C.create_duel(C.int(seed))
-	return uintptr(pDuel)
-}
-func StartDuel(pduel uintptr, options int32) {
-	C.start_duel(C.longlong(pduel), C.int32_t(options))
-}
-func EndDuel(pduel uintptr) {
-	C.end_duel(C.longlong(pduel))
-}
-func SetPlayerInfo(pduel uintptr, playerId, lp, startCount, drawCount int32) {
-	C.set_player_info(C.longlong(pduel), C.int32_t(playerId), C.int32_t(lp), C.int32_t(startCount), C.int32_t(drawCount))
-}
-
-const (
-	LogMessageBufLen = 1024
-	MessageBufLen    = 0x1000
-	QueryCardBufLen  = 0x2000
-	ResponsebBufLen  = 64
-)
-
-// GetLogMessage 返回[]byte 长度固定为1024
-func GetLogMessage(pduel uintptr) []byte {
-	var buf = make([]byte, LogMessageBufLen)
-	C.get_log_message(C.longlong(pduel), (*C.uchar)(unsafe.Pointer(&buf[0])))
-	return buf
-}
-
-func GetMessage(pduel uintptr) ([]byte, int32) {
-	var buff = make([]byte, MessageBufLen)
-	return buff, int32(C.get_message(C.longlong(pduel), (*C.uchar)(unsafe.Pointer(&buff[0]))))
-}
-func Process(pduel uintptr) int32 {
-	return int32(C.process(C.longlong(pduel)))
-}
-func NewCard(pduel uintptr, code uint32, owner, playerid, location, sequence, position uint8) {
-	C.new_card(C.longlong(pduel), C.uint32_t(code), C.uint8_t(owner), C.uint8_t(playerid), C.uint8_t(location), C.uint8_t(sequence), C.uint8_t(position))
-}
-
-// QueryCard  buf 长度要大于 0x2000
-func QueryCard(pduel uintptr, playerid, location, sequence uint8, queryFlag int32, buf []byte, useCache int32) int32 {
-	return int32(C.query_card(C.longlong(pduel), C.uint8_t(playerid), C.uint8_t(location), C.uint8_t(sequence), C.int32_t(queryFlag), (*C.uchar)(unsafe.Pointer(&buf[0])), C.int32_t(useCache)))
-}
-
-func QueryFieldCount(pduel uintptr, playerid, location uint8) int32 {
-	return int32(C.query_field_count(C.longlong(pduel), C.uint8_t(playerid), C.uint8_t(location)))
-}
-func QueryFieldCard(pduel uintptr, playerid, location uint8, queryFlag int32, buf []byte, useCache int32) int32 {
-	return int32(C.query_field_card(C.longlong(pduel), C.uint8_t(playerid), C.uint8_t(location), C.int32_t(queryFlag), (*C.uchar)(unsafe.Pointer(&buf[0])), C.int32_t(useCache)))
-}
-
-func QueryFieldInfo(pduel uintptr, buf []byte) int32 {
-	return int32(C.query_field_info(C.longlong(pduel), (*C.uchar)(unsafe.Pointer(&buf[0]))))
-}
-func SetResponsei(pduel uintptr, value int32) {
-	C.set_responsei(C.longlong(pduel), C.int32_t(value))
-}
-func SetResponseb(pduel uintptr, buf []byte) {
-	C.set_responseb(C.longlong(pduel), (*C.uchar)(unsafe.Pointer(&buf[0])))
-}
-func PreloadScript(pduel uintptr, script []byte) int32 {
-	return int32(C.preload_script(C.longlong(pduel), (*C.char)(unsafe.Pointer(&script[0])), C.int32_t(len(script))))
+type ScriptReader func(scriptName string) (data []byte)
+type MessageHandler func(msg string)
+type CardReader func(cardId int32) *CardData
+type YGOCore struct {
+	CreateDuel        func(seed int32) uintptr
+	StartDuel         func(pduel uintptr, options int32)
+	EndDuel           func(pduel uintptr)
+	SetPlayerInfo     func(pduel uintptr, playerId, LP, startCount, drawCount int32)
+	GetLogMessage     func(pduel uintptr, buf []byte)
+	GetMessage        func(pduel uintptr, buf []byte) int32
+	Process           func(pduel uintptr) int32
+	NewCard           func(pduel uintptr, code uint32, owner, playerid, location, sequence, position uint8)
+	QueryCard         func(pduel uintptr, playerid, location, sequence uint8, queryFlag int32, buf []byte, useCache int32) int32
+	QueryFieldCount   func(pduel uintptr, playerid, location uint8) int32
+	QueryFieldCard    func(pduel uintptr, playerId, location uint8, queryFlag int32, buf []byte, useCache int32) int32
+	QueryFieldInfo    func(pduel uintptr, buf []byte) int32
+	SetResponseI      func(pduel uintptr, value int32)
+	SetResponseB      func(pduel uintptr, buf []byte)
+	PreloadScript     func(pduel uintptr, script string, len int32) int32
+	setScriptReader   func(f uintptr)
+	ScriptReader      ScriptReader
+	setCardReader     func(f uintptr)
+	CardReader        CardReader
+	MessageHandler    MessageHandler
+	setMessageHandler func(f uintptr)
 }
