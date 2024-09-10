@@ -150,7 +150,7 @@ type YGOCore struct {
 	SetPlayerInfo     func(pduel uintptr, playerId, LP, startCount, drawCount int32)
 	GetLogMessage     func(pduel uintptr, buf []byte)
 	GetMessage        func(pduel uintptr, buf []byte) int32
-	Process           func(pduel uintptr) int32
+	Process           func(pduel uintptr) uint32
 	NewCard           func(pduel uintptr, code uint32, owner, playerid, location, sequence, position uint8)
 	QueryCard         func(pduel uintptr, playerid, location, sequence uint8, queryFlag int32, buf []byte, useCache int32) int32
 	QueryFieldCount   func(pduel uintptr, playerid, location uint8) int32
